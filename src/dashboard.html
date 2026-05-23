@@ -1,0 +1,2148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenClaw Swarm — Command Center</title>
+    <style>
+        /* ═══════════════════════════════════════
+           DESIGN SYSTEM — Kimi's Gold Palette
+           ═══════════════════════════════════════ */
+        :root {
+            /* Backgrounds */
+            --bg-primary: #0A0A0A;
+            --bg-secondary: #111111;
+            --bg-tertiary: #1a1a1a;
+            --bg-elevated: #222222;
+            --bg-hover: #1c1c1c;
+
+            /* Borders */
+            --border-subtle: rgba(255,255,255,0.05);
+            --border-medium: rgba(255,255,255,0.10);
+            --border-strong: rgba(255,255,255,0.15);
+
+            /* Text */
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255,255,255,0.60);
+            --text-muted: rgba(255,255,255,0.40);
+            --text-disabled: rgba(255,255,255,0.25);
+
+            /* Accent — Gold (from Kimi) */
+            --accent-primary: #F6A94C;
+            --accent-primary-dim: rgba(246,169,76,0.15);
+            --accent-blue: #58a6ff;
+
+            /* Status */
+            --status-pending: #8b949e;
+            --status-running: #58a6ff;
+            --status-blocked: #f59e0b;
+            --status-reviewing: #a855f7;
+            --status-approved: #10b981;
+            --status-rejected: #ef4444;
+            --status-skipped: #6e7681;
+            --status-error: #ef4444;
+
+            /* Agent Colors */
+            --agent-architect: #58a6ff;
+            --agent-coder: #10b981;
+            --agent-tester: #ef4444;
+            --agent-frontend: #f59e0b;
+            --agent-devops: #a855f7;
+            --agent-queen: #f472b6;
+            --agent-coordinator: #d8b4fe;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            height: 100vh;
+            overflow: hidden;
+            font-size: 14px;
+        }
+
+        /* ═══════════════════════════════════════
+           LAYOUT: Sidebar + Main
+           ═══════════════════════════════════════ */
+        .app {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: 60px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 0;
+            flex-shrink: 0;
+        }
+
+        .nav-item {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 20px;
+            margin-bottom: 8px;
+            transition: all 0.15s;
+            position: relative;
+        }
+
+        .nav-item:hover { background: var(--bg-tertiary); }
+        .nav-item.active {
+            background: var(--accent-primary-dim);
+        }
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: -12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 24px;
+            background: var(--accent-primary);
+            border-radius: 0 2px 2px 0;
+        }
+
+        /* ── Main Content ── */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ── TopBar ── */
+        .topbar {
+            height: 52px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            flex-shrink: 0;
+        }
+
+        .breadcrumbs {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .breadcrumbs .crumb-link {
+            cursor: pointer;
+            transition: color 0.15s;
+        }
+        .breadcrumbs .crumb-link:hover { color: var(--text-secondary); }
+        .breadcrumbs .crumb-sep { color: var(--text-disabled); }
+        .breadcrumbs .crumb-current { color: var(--text-primary); font-weight: 500; }
+
+        .topbar-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        /* ── Page Content ── */
+        .page {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .page::-webkit-scrollbar { width: 6px; }
+        .page::-webkit-scrollbar-track { background: transparent; }
+        .page::-webkit-scrollbar-thumb { background: var(--border-medium); border-radius: 3px; }
+
+        /* ═══════════════════════════════════════
+           COMPONENTS
+           ═══════════════════════════════════════ */
+
+        /* ── Hero Section ── */
+        .hero {
+            background: linear-gradient(135deg, rgba(246,169,76,0.08) 0%, transparent 60%);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::after {
+            content: '';
+            position: absolute;
+            top: 0; right: 0;
+            width: 200px; height: 200px;
+            background: radial-gradient(circle, rgba(246,169,76,0.06) 0%, transparent 70%);
+        }
+
+        .hero-streak {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--accent-primary-dim);
+            color: var(--accent-primary);
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .hero-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .hero-subtitle {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        /* ── Metric Cards ── */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .metric-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 16px;
+            transition: border-color 0.15s;
+        }
+
+        .metric-card:hover { border-color: var(--border-medium); }
+
+        .metric-icon {
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+
+        .metric-value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .metric-label {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .metric-card.pending { background: rgba(139,148,158,0.05); }
+        .metric-card.agents { background: rgba(88,166,255,0.05); }
+        .metric-card.running { background: rgba(88,166,255,0.05); }
+        .metric-card.velocity { background: rgba(16,185,129,0.05); }
+
+        /* ── Section Headers ── */
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-count {
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        /* ── Attention List ── */
+        .attention-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+
+        .attention-item {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            transition: border-color 0.15s;
+        }
+
+        .attention-item:hover { border-color: var(--border-medium); }
+
+        .attention-icon {
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .attention-content { flex: 1; }
+
+        .attention-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .attention-meta {
+            color: var(--text-muted);
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .attention-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* ── Buttons ── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.15s;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .btn:hover { opacity: 0.85; }
+        .btn:active { transform: scale(0.98); }
+
+        .btn-primary {
+            background: var(--accent-primary);
+            color: #000;
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-medium);
+        }
+
+        .btn-success {
+            background: var(--status-approved);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--status-rejected);
+            color: white;
+        }
+
+        .btn-warning {
+            background: var(--status-blocked);
+            color: #000;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-secondary);
+        }
+
+        .btn-ghost:hover { background: var(--bg-tertiary); }
+
+        .btn-sm {
+            padding: 6px 10px;
+            font-size: 12px;
+        }
+
+        /* ── Epic Cards ── */
+        .epic-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .epic-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: border-color 0.15s;
+        }
+
+        .epic-card:hover { border-color: var(--border-medium); }
+
+        .epic-header {
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+        }
+
+        .epic-title {
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .epic-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .epic-progress {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .progress-bar {
+            width: 120px;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-primary);
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+
+        .epic-body {
+            padding: 0 20px 20px;
+            display: none;
+        }
+
+        .epic-card.expanded .epic-body { display: block; }
+
+        /* ── Story Cards ── */
+        .story-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+        }
+
+        .story-card {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 14px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .story-card:hover {
+            border-color: var(--border-medium);
+            background: var(--bg-hover);
+        }
+
+        .story-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .story-status {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .story-status.queued { background: rgba(139,148,158,0.15); color: var(--status-pending); }
+        .story-status.running { background: rgba(88,166,255,0.15); color: var(--status-running); }
+        .story-status.blocked { background: rgba(245,158,11,0.15); color: var(--status-blocked); }
+        .story-status.reviewing { background: rgba(168,85,247,0.15); color: var(--status-reviewing); }
+        .story-status.approved { background: rgba(16,185,129,0.15); color: var(--status-approved); }
+        .story-status.rejected { background: rgba(239,68,68,0.15); color: var(--status-rejected); }
+        .story-status.skipped { background: rgba(110,118,129,0.15); color: var(--status-skipped); }
+
+        .story-name {
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .story-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .story-blocker {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(245,158,11,0.1);
+            color: var(--status-blocked);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-top: 8px;
+        }
+
+        /* ── Phase Timeline ── */
+        .phase-timeline {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            margin-bottom: 24px;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+        }
+
+        .phase-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            position: relative;
+        }
+
+        .phase-step:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            top: 16px;
+            right: -50%;
+            width: 100%;
+            height: 2px;
+            background: var(--bg-tertiary);
+        }
+
+        .phase-step.completed:not(:last-child)::after {
+            background: var(--status-approved);
+        }
+
+        .phase-step.running:not(:last-child)::after {
+            background: linear-gradient(90deg, var(--status-running), var(--bg-tertiary));
+        }
+
+        .phase-dot {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            background: var(--bg-tertiary);
+            border: 2px solid var(--border-medium);
+            z-index: 1;
+        }
+
+        .phase-step.completed .phase-dot {
+            background: var(--status-approved);
+            border-color: var(--status-approved);
+        }
+
+        .phase-step.running .phase-dot {
+            background: var(--status-running);
+            border-color: var(--status-running);
+            animation: pulse 2s infinite;
+        }
+
+        .phase-step.blocked .phase-dot {
+            background: var(--status-blocked);
+            border-color: var(--status-blocked);
+        }
+
+        .phase-step.reviewing .phase-dot {
+            background: var(--status-reviewing);
+            border-color: var(--status-reviewing);
+        }
+
+        .phase-label {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .phase-step.active .phase-label {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(88,166,255,0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(88,166,255,0); }
+        }
+
+        /* ── Activity Stream ── */
+        .activity-stream {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .activity-item {
+            display: flex;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            transition: background 0.15s;
+        }
+
+        .activity-item:hover { background: var(--bg-tertiary); }
+
+        .activity-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+            background: var(--bg-tertiary);
+        }
+
+        .activity-content { flex: 1; min-width: 0; }
+
+        .activity-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .activity-actor {
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .activity-action {
+            color: var(--text-secondary);
+        }
+
+        .activity-time {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .activity-body {
+            color: var(--text-secondary);
+            font-size: 13px;
+            word-break: break-word;
+        }
+
+        .activity-body code {
+            background: var(--bg-tertiary);
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-family: 'SF Mono', monospace;
+            font-size: 12px;
+        }
+
+        /* ── Agent Cards ── */
+        .agent-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .agent-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 14px;
+            position: relative;
+            transition: all 0.15s;
+        }
+
+        .agent-card:hover {
+            border-color: var(--border-medium);
+            transform: translateY(-1px);
+        }
+
+        .agent-card .agent-border {
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 3px;
+            border-radius: 10px 0 0 10px;
+        }
+
+        .agent-card[data-persona="architect"] .agent-border { background: var(--agent-architect); }
+        .agent-card[data-persona="coder"] .agent-border { background: var(--agent-coder); }
+        .agent-card[data-persona="tester"] .agent-border { background: var(--agent-tester); }
+        .agent-card[data-persona="frontend"] .agent-border { background: var(--agent-frontend); }
+        .agent-card[data-persona="devops"] .agent-border { background: var(--agent-devops); }
+
+        .agent-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            padding-left: 8px;
+        }
+
+        .agent-icon {
+            font-size: 24px;
+        }
+
+        .agent-info { flex: 1; }
+
+        .agent-name {
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .agent-status {
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-dot.live { background: var(--status-approved); animation: pulse 2s infinite; }
+        .status-dot.busy { background: var(--status-blocked); }
+        .status-dot.wait { background: var(--status-pending); }
+        .status-dot.error { background: var(--status-error); }
+
+        .agent-task {
+            color: var(--text-muted);
+            font-size: 12px;
+            padding-left: 8px;
+        }
+
+        /* ── Filter Bar ── */
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .search-input {
+            flex: 1;
+            max-width: 300px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: var(--text-primary);
+            font-size: 13px;
+            outline: none;
+        }
+
+        .search-input:focus { border-color: var(--accent-primary); }
+
+        .search-input::placeholder { color: var(--text-disabled); }
+
+        .filter-select {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: var(--text-primary);
+            font-size: 13px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        /* ── Empty State ── */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 48px 24px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .empty-state-desc {
+            font-size: 13px;
+            max-width: 400px;
+            margin-bottom: 16px;
+        }
+
+        /* ── Toast Notifications ── */
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: var(--bg-elevated);
+            border-left: 3px solid;
+            border-radius: 8px;
+            padding: 14px 18px;
+            min-width: 300px;
+            max-width: 400px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+            pointer-events: all;
+            animation: toastIn 0.3s ease, toastOut 0.3s ease 4.7s forwards;
+        }
+
+        .toast.info { border-color: var(--accent-blue); }
+        .toast.success { border-color: var(--status-approved); }
+        .toast.warning { border-color: var(--status-blocked); }
+        .toast.error { border-color: var(--status-error); }
+
+        .toast-title {
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+
+        .toast-message {
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes toastOut {
+            from { opacity: 1; transform: translateX(0); }
+            to { opacity: 0; transform: translateX(20px); }
+        }
+
+        /* ── Disconnect Banner ── */
+        .disconnect-banner {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            background: var(--status-blocked);
+            color: #000;
+            text-align: center;
+            padding: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            z-index: 1001;
+            display: none;
+        }
+
+        .disconnect-banner.visible { display: block; }
+
+        /* ── Command Palette ── */
+        .cmd-palette-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            display: none;
+            align-items: flex-start;
+            justify-content: center;
+            padding-top: 20vh;
+            z-index: 1002;
+        }
+
+        .cmd-palette-overlay.visible { display: flex; }
+
+        .cmd-palette {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-medium);
+            border-radius: 12px;
+            width: 560px;
+            max-width: 90vw;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+
+        .cmd-palette-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            padding: 16px 20px;
+            color: var(--text-primary);
+            font-size: 16px;
+            outline: none;
+        }
+
+        .cmd-palette-input::placeholder { color: var(--text-disabled); }
+
+        .cmd-palette-results {
+            max-height: 300px;
+            overflow-y: auto;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .cmd-result {
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .cmd-result:hover, .cmd-result.selected {
+            background: var(--bg-tertiary);
+        }
+
+        .cmd-result-icon {
+            font-size: 16px;
+        }
+
+        .cmd-result-label {
+            flex: 1;
+        }
+
+        .cmd-result-shortcut {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        /* ── Detail View (Phase Detail) ── */
+        .detail-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-subtle);
+            padding-bottom: 1px;
+        }
+
+        .detail-tab {
+            padding: 8px 14px;
+            font-size: 13px;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.15s;
+        }
+
+        .detail-tab:hover { color: var(--text-secondary); }
+        .detail-tab.active {
+            color: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .detail-panel { display: none; }
+        .detail-panel.active { display: block; }
+
+        /* ── Artifact List ── */
+        .artifact-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .artifact-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .artifact-item:hover { background: var(--bg-tertiary); }
+
+        .artifact-icon { font-size: 20px; }
+
+        .artifact-info { flex: 1; }
+
+        .artifact-name {
+            font-weight: 500;
+            font-size: 13px;
+        }
+
+        .artifact-meta {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        /* ── Letter Thread ── */
+        .letter-thread {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .letter-item {
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            padding: 14px;
+            border-left: 3px solid var(--border-medium);
+        }
+
+        .letter-item[data-from="architect"] { border-color: var(--agent-architect); }
+        .letter-item[data-from="coder"] { border-color: var(--agent-coder); }
+        .letter-item[data-from="tester"] { border-color: var(--agent-tester); }
+
+        .letter-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .letter-from {
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .letter-time {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .letter-body {
+            color: var(--text-secondary);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        /* ── Safe Action Bar ── */
+        .action-bar {
+            position: fixed;
+            bottom: 0; left: 60px; right: 0;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-subtle);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 100;
+        }
+
+        .action-bar-spacer {
+            flex: 1;
+        }
+
+        /* ── Utility ── */
+        .hidden { display: none !important; }
+
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .gap-2 { gap: 8px; }
+        .gap-4 { gap: 16px; }
+
+        .text-muted { color: var(--text-muted); }
+        .text-secondary { color: var(--text-secondary); }
+
+        .mb-4 { margin-bottom: 16px; }
+        .mb-6 { margin-bottom: 24px; }
+
+        /* ── Spinner ── */
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border-medium);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ── Mock Mode Badge ── */
+        .mock-badge {
+            position: fixed;
+            top: 60px;
+            right: 24px;
+            background: var(--status-blocked);
+            color: #000;
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+            z-index: 100;
+            display: none;
+        }
+
+        .mock-badge.visible { display: block; }
+    </style>
+</head>
+<body>
+    <!-- Disconnect Banner -->
+    <div class="disconnect-banner" id="disconnect-banner">
+        ⚠️ Connection lost — reconnecting in <span id="reconnect-timer">3</span>s...
+    </div>
+
+    <!-- Command Palette -->
+    <div class="cmd-palette-overlay" id="cmd-palette">
+        <div class="cmd-palette">
+            <input type="text" class="cmd-palette-input" id="cmd-input" placeholder="Search epics, stories, agents...">
+            <div class="cmd-palette-results" id="cmd-results"></div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Mock Mode Badge -->
+    <div class="mock-badge" id="mock-badge">🧪 MOCK MODE</div>
+
+    <div class="app">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="nav-item active" data-screen="overview" title="Overview">🏠</div>
+            <div class="nav-item" data-screen="epics" title="Epic Board">📋</div>
+            <div class="nav-item" data-screen="story" title="Story Phase" style="display:none">⚡</div>
+            <div class="nav-item" data-screen="agents" title="Agent Health">🤖</div>
+            <div class="nav-item" data-screen="settings" title="Settings">⚙️</div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="main">
+            <!-- TopBar -->
+            <header class="topbar">
+                <div class="breadcrumbs" id="breadcrumbs">
+                    <span>🔷 OpenClaw Swarm</span>
+                </div>
+                <div class="topbar-actions">
+                    <button class="btn btn-ghost btn-sm" id="btn-mock" title="Toggle Mock Mode">🧪</button>
+                    <button class="btn btn-ghost btn-sm" id="btn-help" title="Keyboard Shortcuts (?)">⌨️</button>
+                </div>
+            </header>
+
+            <!-- Page: Overview Dashboard -->
+            <div class="page" id="screen-overview">
+                <div class="hero">
+                    <div class="hero-streak">🔥 Active Streak: 5 Days</div>
+                    <div class="hero-title">Welcome back, Architect</div>
+                    <div class="hero-subtitle">
+                        You have <strong>4 pending approvals</strong>, <strong>12 active agents</strong>,
+                        and <strong>3 phases</strong> running.
+                    </div>
+                </div>
+
+                <!-- ═══════════════════════════════════════
+                     TASK INPUT PANEL — Create tasks from the UI
+                     ═══════════════════════════════════════ -->
+                <div class="task-input-panel" id="task-input-panel" style="margin-bottom: 24px; background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 20px;">
+                    <div style="font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 12px;">💬 Tell the swarm what to build</div>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <input type="text" id="task-input" class="search-input" style="flex: 1; max-width: none; font-size: 15px; padding: 14px 18px; border-radius: 8px;" placeholder="e.g. Build Day Seal feature for MouminA">
+                        <button class="btn btn-primary" id="btn-create-task" style="padding: 14px 24px; font-size: 14px; font-weight: 600; border-radius: 8px;">⚡ Create Task</button>
+                    </div>
+                    <div style="margin-top: 10px; color: var(--text-muted); font-size: 12px;">
+                        The swarm will auto-size the work, plan phases, assign personas, and start executing.
+                    </div>
+                </div>
+
+                <div class="metrics-grid">
+                    <div class="metric-card pending">
+                        <div class="metric-icon">🔔</div>
+                        <div class="metric-value" id="metric-pending">4</div>
+                        <div class="metric-label">Pending Approvals</div>
+                    </div>
+                    <div class="metric-card agents">
+                        <div class="metric-icon">🤖</div>
+                        <div class="metric-value" id="metric-agents">12</div>
+                        <div class="metric-label">Active Agents</div>
+                    </div>
+                    <div class="metric-card running">
+                        <div class="metric-icon">⚡</div>
+                        <div class="metric-value" id="metric-running">3</div>
+                        <div class="metric-label">Running Phases</div>
+                    </div>
+                    <div class="metric-card velocity">
+                        <div class="metric-icon">📈</div>
+                        <div class="metric-value" id="metric-velocity">1.4x</div>
+                        <div class="metric-label">Velocity Today</div>
+                    </div>
+                </div>
+
+                <div class="section-header">
+                    <div class="section-title">⚠️ Needs Your Attention</div>
+                </div>
+                <div class="attention-list" id="attention-list">
+                    <!-- Populated by JS -->
+                </div>
+
+                <div class="section-header">
+                    <div class="section-title">🏗️ Active Epics</div>
+                </div>
+                <div class="epic-list" id="overview-epics">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Page: Epic Board -->
+            <div class="page hidden" id="screen-epics">
+                <div class="section-header">
+                    <div class="section-title">📋 Epic Board</div>
+                    <button class="btn btn-primary" id="btn-new-epic">+ New Epic</button>
+                </div>
+
+                <div class="filter-bar">
+                    <input type="text" class="search-input" id="epic-search" placeholder="🔍 Search epics...">
+                    <select class="filter-select" id="epic-filter">
+                        <option value="all">All</option>
+                        <option value="active">Active</option>
+                        <option value="completed">Completed</option>
+                        <option value="archived">Archived</option>
+                    </select>
+                </div>
+
+                <div class="epic-list" id="epic-board">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Page: Story Phase (Primary) -->
+            <div class="page hidden" id="screen-story">
+                <div class="section-header">
+                    <button class="btn btn-ghost btn-sm" id="btn-back-epic">← Back</button>
+                    <div class="section-title" id="story-title">Story Name</div>
+                    <div class="section-count" id="story-duration">⏱️ 45m</div>
+                </div>
+
+                <div class="phase-timeline" id="phase-timeline">
+                    <!-- Populated by JS -->
+                </div>
+
+                <div class="section-header">
+                    <div class="section-title">📜 Activity Stream</div>
+                    <div class="flex gap-2">
+                        <select class="filter-select" id="activity-filter">
+                            <option value="all">All</option>
+                            <option value="commits">Commits</option>
+                            <option value="letters">Letters</option>
+                            <option value="errors">Errors</option>
+                            <option value="system">System</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="activity-stream" id="activity-stream">
+                    <!-- Populated by JS -->
+                </div>
+
+                <div class="section-header">
+                    <div class="section-title">🤖 Active Agents</div>
+                </div>
+                <div class="agent-grid" id="agent-grid">
+                    <!-- Populated by JS -->
+                </div>
+
+                <!-- Safe Action Bar -->
+                <div style="height: 60px"></div>
+            </div>
+
+            <!-- Page: Phase Detail -->
+            <div class="page hidden" id="screen-detail">
+                <div class="section-header">
+                    <button class="btn btn-ghost btn-sm" id="btn-back-phase">← Back</button>
+                    <div class="section-title" id="detail-title">Phase Detail</div>
+                </div>
+
+                <div class="detail-tabs">
+                    <div class="detail-tab active" data-tab="artifacts">📁 Artifacts</div>
+                    <div class="detail-tab" data-tab="letters">💬 Letters</div>
+                    <div class="detail-tab" data-tab="commits">🔨 Commits</div>
+                    <div class="detail-tab" data-tab="review">🔍 Review</div>
+                </div>
+
+                <div class="detail-panel active" id="panel-artifacts">
+                    <div class="artifact-list" id="artifact-list"></div>
+                </div>
+                <div class="detail-panel" id="panel-letters">
+                    <div class="letter-thread" id="letter-list"></div>
+                </div>
+                <div class="detail-panel" id="panel-commits">
+                    <div class="activity-stream" id="commit-list"></div>
+                </div>
+                <div class="detail-panel" id="panel-review">
+                    <div id="review-content"></div>
+                </div>
+            </div>
+
+            <!-- Page: Agent Health -->
+            <div class="page hidden" id="screen-agents">
+                <div class="section-header">
+                    <div class="section-title">🤖 Agent Health</div>
+                </div>
+                <div class="agent-grid" id="health-grid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Bar (for Story Phase) -->
+    <div class="action-bar hidden" id="action-bar">
+        <button class="btn btn-success" id="btn-approve">✅ Approve</button>
+        <button class="btn btn-warning" id="btn-request">📝 Request Changes</button>
+        <button class="btn btn-secondary" id="btn-pause">⏸ Pause</button>
+        <div class="action-bar-spacer"></div>
+        <div class="dropdown">
+            <button class="btn btn-ghost btn-sm" id="btn-more">···</button>
+        </div>
+    </div>
+
+    <script>
+        // ═══════════════════════════════════════
+        // STATE & CONFIG
+        // ═══════════════════════════════════════
+        const state = {
+            screen: 'overview',
+            epicId: null,
+            storyId: null,
+            phaseId: null,
+            mockMode: false,
+            sseConnected: false,
+            reconnectDelay: 3000,
+            data: {
+                epics: [],
+                stories: {},
+                phases: {},
+                agents: {},
+                activity: {},
+                attention: [],
+            }
+        };
+
+        // ═══════════════════════════════════════
+        // MOCK DATA (for visual testing)
+        // ═══════════════════════════════════════
+        const MOCK = {
+            epics: [
+                {
+                    id: 'epic-1',
+                    name: 'Social Tab Rebuild',
+                    status: 'active',
+                    progress: 40,
+                    story_count: 5,
+                    completed_stories: 2,
+                    duration: '2h 15m',
+                    stories: [
+                        { id: 'story-1', name: 'Friendship System', status: 'completed', duration: '12m', blocker: null },
+                        { id: 'story-2', name: 'Activity Feed', status: 'running', duration: '45m', blocker: null },
+                        { id: 'story-3', name: 'Messaging', status: 'blocked', duration: '0m', blocker: 'Blocked by Story 1' },
+                        { id: 'story-4', name: 'Notifications', status: 'queued', duration: '0m', blocker: null },
+                        { id: 'story-5', name: 'Group Chat', status: 'queued', duration: '0m', blocker: null },
+                    ]
+                },
+                {
+                    id: 'epic-2',
+                    name: 'Profile Redesign',
+                    status: 'active',
+                    progress: 25,
+                    story_count: 4,
+                    completed_stories: 1,
+                    duration: '1h 30m',
+                    stories: [
+                        { id: 'story-6', name: 'Avatar Upload', status: 'completed', duration: '20m', blocker: null },
+                        { id: 'story-7', name: 'Bio Editor', status: 'running', duration: '30m', blocker: null },
+                        { id: 'story-8', name: 'Privacy Settings', status: 'queued', duration: '0m', blocker: null },
+                        { id: 'story-9', name: 'Theme Picker', status: 'queued', duration: '0m', blocker: null },
+                    ]
+                }
+            ],
+            attention: [
+                {
+                    icon: '▶️',
+                    title: 'Phase "Implementation" needs your approval',
+                    meta: 'Story: Activity Feed · Epic: Social Tab Rebuild',
+                    actions: [{ label: 'Review Now', class: 'btn-primary', action: 'review' }]
+                },
+                {
+                    icon: '🔴',
+                    title: 'Agent Coder A errored in "Friendship System"',
+                    meta: 'Error: Timeout after 30s · Retry count: 2',
+                    actions: [
+                        { label: 'View Error', class: 'btn-secondary', action: 'error' },
+                        { label: 'Retry Agent', class: 'btn-warning', action: 'retry' }
+                    ]
+                },
+                {
+                    icon: '⏸️',
+                    title: 'Story "Messaging" blocked by "Friendship System"',
+                    meta: 'Dependency: hard · Waiting for completion',
+                    actions: [{ label: 'View Blocker', class: 'btn-secondary', action: 'blocker' }]
+                }
+            ],
+            phases: [
+                { id: 'phase-1', name: 'Planning', status: 'completed', number: 1 },
+                { id: 'phase-2', name: 'Design', status: 'completed', number: 2 },
+                { id: 'phase-3', name: 'Implementation', status: 'running', number: 3 },
+                { id: 'phase-4', name: 'Review', status: 'pending', number: 4 },
+                { id: 'phase-5', name: 'Ship', status: 'pending', number: 5 },
+            ],
+            agents: [
+                { id: 'agent-1', persona: 'architect', name: 'Architect A', status: 'live', task: 'db done', health: 95, errors: 0 },
+                { id: 'agent-2', persona: 'coder', name: 'Coder A', status: 'busy', task: 'xp svc', health: 72, errors: 2 },
+                { id: 'agent-3', persona: 'coder', name: 'Coder B', status: 'busy', task: 'UI badge', health: 88, errors: 0 },
+                { id: 'agent-4', persona: 'frontend', name: 'Frontend A', status: 'wait', task: 'wiring', health: 100, errors: 0 },
+            ],
+            activity: [
+                { actor: 'Coder A', actor_type: '🤖', action: 'created migration', body: 'v5_add_day_seal.sql', time: '07:52:15', type: 'commit' },
+                { actor: 'Coder B', actor_type: '🤖', action: 'wrote', body: 'calculateDaySeal()', time: '07:52:30', type: 'commit' },
+                { actor: 'Auto-check', actor_type: '⚙️', action: 'compiled', body: '✅ Compile OK', time: '07:52:45', type: 'system' },
+                { actor: 'Coder A', actor_type: '💬', action: 'asked Coder D', body: '"Need user.id vs userId — which does UserProvider use?"', time: '07:53:00', type: 'letter' },
+                { actor: 'Coder D', actor_type: '🤖', action: 'replied', body: '"user.id — confirmed. Check db/client.ts L42."', time: '07:53:15', type: 'letter' },
+                { actor: 'Coder A', actor_type: '🤖', action: 'completed', body: '3 tasks [+2]', time: '07:54:00', type: 'commit' },
+            ]
+        };
+
+        // ═══════════════════════════════════════
+        // NAVIGATION
+        // ═══════════════════════════════════════
+        function navigateTo(screen, params = {}) {
+            document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+            document.getElementById('screen-' + screen).classList.remove('hidden');
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            const navItem = document.querySelector('.nav-item[data-screen="' + screen + '"]');
+            if (navItem) navItem.classList.add('active');
+
+            state.screen = screen;
+            Object.assign(state, params);
+            updateBreadcrumbs();
+
+            if (screen === 'story') {
+                document.getElementById('action-bar').classList.remove('hidden');
+                // Load real data then render
+                loadStoryData(state.storyId).then(() => renderStoryPhase());
+            } else if (screen === 'detail') {
+                document.getElementById('action-bar').classList.add('hidden');
+                renderPhaseDetail();
+            } else {
+                document.getElementById('action-bar').classList.add('hidden');
+                if (screen === 'overview') renderOverview();
+                if (screen === 'epics') renderEpicBoard();
+            }
+        }
+
+        function updateBreadcrumbs() {
+            const bc = document.getElementById('breadcrumbs');
+            const parts = ['<span>🔷 OpenClaw Swarm</span>'];
+
+            if (state.screen === 'epics') {
+                parts.push('<span class="crumb-sep">/</span>', '<span class="crumb-current">Epic Board</span>');
+            } else if (state.screen === 'story' && state.storyId) {
+                const epic = MOCK.epics.find(e => e.stories.find(s => s.id === state.storyId));
+                const epicName = epic ? epic.name : 'Epic';
+                parts.push('<span class="crumb-sep">/</span>', `<span class="crumb-link" onclick="navigateTo('epics')">${epicName}</span>`);
+                const story = epic?.stories.find(s => s.id === state.storyId);
+                parts.push('<span class="crumb-sep">/</span>', `<span class="crumb-current">${story?.name || 'Story'}</span>`);
+            } else if (state.screen === 'detail' && state.phaseId) {
+                parts.push('<span class="crumb-sep">/</span>', '<span class="crumb-link" onclick="navigateTo(\'story\')">Story</span>');
+                parts.push('<span class="crumb-sep">/</span>', '<span class="crumb-current">Phase Detail</span>');
+            }
+
+            bc.innerHTML = parts.join('');
+        }
+
+        // Sidebar clicks
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => navigateTo(item.dataset.screen));
+        });
+
+        document.getElementById('btn-back-epic').addEventListener('click', () => navigateTo('epics'));
+        document.getElementById('btn-back-phase').addEventListener('click', () => navigateTo('story'));
+
+        // ═══════════════════════════════════════
+        // RENDER: Overview Dashboard
+        // ═══════════════════════════════════════
+        function renderOverview() {
+            const attentionList = document.getElementById('attention-list');
+            attentionList.innerHTML = state.data.attention.map((item, idx) => `
+                <div class="attention-item">
+                    <div class="attention-icon">${item.icon}</div>
+                    <div class="attention-content">
+                        <div class="attention-title">${item.title}</div>
+                        <div class="attention-meta">${item.meta}</div>
+                        <div class="attention-actions">
+                            ${item.actions.map((a, aidx) => `<button class="btn ${a.class} btn-sm" onclick="handleAttentionAction(${idx}, ${aidx})">${a.label}</button>`).join('')}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            const epicList = document.getElementById('overview-epics');
+            epicList.innerHTML = state.data.epics.map(epic => `
+                <div class="epic-card" data-epic="${epic.id}" onclick="navigateTo('epics'); state.epicId='${epic.id}'; renderEpicBoard();" style="cursor: pointer;">
+                    <div class="epic-header">
+                        <div class="epic-title">🏗️ ${epic.name}</div>
+                        <div class="epic-meta">
+                            <div class="epic-progress">
+                                <div class="progress-bar"><div class="progress-fill" style="width:${epic.progress}%"></div></div>
+                                <span>${epic.progress}%</span>
+                            </div>
+                            <span>· ${epic.completed_stories}/${epic.story_count} stories</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // ═══════════════════════════════════════
+        // RENDER: Epic Board
+        // ═══════════════════════════════════════
+        function renderEpicBoard() {
+            const board = document.getElementById('epic-board');
+            const filter = document.getElementById('epic-filter').value;
+            const search = document.getElementById('epic-search').value.toLowerCase();
+
+            let epics = state.data.epics;
+            if (filter !== 'all') epics = epics.filter(e => e.status === filter);
+            if (search) epics = epics.filter(e => e.name.toLowerCase().includes(search));
+
+            if (epics.length === 0) {
+                board.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🏗️</div>
+                        <div class="empty-state-title">No active epics yet</div>
+                        <div class="empty-state-desc">Create your first task to start building with your agent swarm</div>
+                        <button class="btn btn-primary" onclick="document.getElementById('task-input').focus(); showToast('Tip', 'Type a task name above and hit Enter', 'info');">+ Create First Task</button>
+                    </div>
+                `;
+                return;
+            }
+
+            board.innerHTML = epics.map(epic => `
+                <div class="epic-card ${state.epicId === epic.id ? 'expanded' : ''}" data-epic="${epic.id}">
+                    <div class="epic-header" onclick="toggleEpic('${epic.id}')">
+                        <div class="epic-title">🏗️ ${epic.name}</div>
+                        <div class="epic-meta">
+                            <div class="epic-progress">
+                                <div class="progress-bar"><div class="progress-fill" style="width:${epic.progress}%"></div></div>
+                                <span>${epic.progress}%</span>
+                            </div>
+                            <span>· ${epic.completed_stories}/${epic.story_count} stories · ⏱️ ${epic.duration}</span>
+                            <span>${state.epicId === epic.id ? '▼' : '▶'}</span>
+                        </div>
+                    </div>
+                    <div class="epic-body">
+                        <div class="story-grid">
+                            ${epic.stories.map(story => `
+                                <div class="story-card" onclick="navigateTo('story', { storyId: '${story.id}' })" data-story="${story.id}">
+                                    <div class="story-header">
+                                        <span class="story-status ${story.status}">${story.status}</span>
+                                        <span class="text-muted">⏱️ ${story.duration}</span>
+                                    </div>
+                                    <div class="story-name">${story.name}</div>
+                                    <div class="story-meta">
+                                        <span>${story.status === 'running' ? '▶️ Live' : story.status === 'completed' ? '✅ Done' : '⏸️ Queued'}</span>
+                                    </div>
+                                    ${story.blocker ? `<div class="story-blocker">⏸️ ${story.blocker}</div>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleEpic(epicId) {
+            state.epicId = state.epicId === epicId ? null : epicId;
+            renderEpicBoard();
+        }
+
+        document.getElementById('epic-search').addEventListener('input', renderEpicBoard);
+        document.getElementById('epic-filter').addEventListener('change', renderEpicBoard);
+
+        // ═══════════════════════════════════════
+        // RENDER: Story Phase View — Uses real API data
+        // ═══════════════════════════════════════
+        async function renderStoryPhase() {
+            const story = findStory(state.storyId);
+            if (!story) return;
+
+            document.getElementById('story-title').textContent = story.name;
+            document.getElementById('story-duration').textContent = '⏱️ ' + (story.duration || 'TBD');
+
+            // Load real data if not already loaded
+            if (!state.storyData || state.storyData.storyId !== state.storyId) {
+                await loadStoryData(state.storyId);
+                state.storyData = state.storyData || {};
+                state.storyData.storyId = state.storyId;
+            }
+
+            const phases = state.storyData.phases || [];
+            const activity = state.storyData.activity || [];
+
+            // Phase Timeline
+            const timeline = document.getElementById('phase-timeline');
+            if (phases.length === 0) {
+                timeline.innerHTML = '<div class="empty-state">No phases yet — task may still be queued</div>';
+            } else {
+                timeline.innerHTML = phases.map((phase) => {
+                    const isActive = phase.status === 'running' || phase.status === 'reviewing';
+                    const icon = phase.status === 'completed' ? '✅' : phase.status === 'running' ? '▶️' : phase.status === 'blocked' ? '⏸️' : phase.status === 'reviewing' ? '👁️' : '○';
+                    return `
+                        <div class="phase-step ${phase.status} ${isActive ? 'active' : ''}" data-phase="${phase.id}" onclick="showPhaseDetail('${phase.id}')" style="cursor:pointer">
+                            <div class="phase-dot">${icon}</div>
+                            <div class="phase-label">${phase.phase_name}</div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // Activity Stream
+            const activityFilter = document.getElementById('activity-filter').value;
+            const stream = document.getElementById('activity-stream');
+            let filtered = activity;
+            if (activityFilter !== 'all') filtered = activity.filter(a => a.action_type === activityFilter);
+
+            if (filtered.length === 0) {
+                stream.innerHTML = '<div class="empty-state">No activity yet</div>';
+            } else {
+                stream.innerHTML = filtered.map(a => `
+                    <div class="activity-item">
+                        <div class="activity-avatar">${a.actor_type || '🤖'}</div>
+                        <div class="activity-content">
+                            <div class="activity-header">
+                                <span class="activity-actor">${a.actor_id || 'Agent'}</span>
+                                <span class="activity-action">${a.action_type || 'acted'}</span>
+                                <span class="activity-time">${new Date(a.timestamp).toLocaleTimeString()}</span>
+                            </div>
+                            <div class="activity-body">${typeof a.payload === 'string' ? a.payload : JSON.stringify(a.payload)}</div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // Agent Grid — placeholder until agents endpoint is fully wired
+            const grid = document.getElementById('agent-grid');
+            grid.innerHTML = phases.map(phase => `
+                <div class="agent-card" data-phase="${phase.id}">
+                    <div class="agent-border"></div>
+                    <div class="agent-header">
+                        <div class="agent-icon">🤖</div>
+                        <div class="agent-info">
+                            <div class="agent-name">${phase.phase_name}</div>
+                            <div class="agent-status">
+                                <span class="status-dot ${phase.status}"></span>
+                                <span>${phase.status === 'running' ? '🟡 Running' : phase.status === 'completed' ? '✅ Done' : phase.status === 'blocked' ? '⏸️ Blocked' : phase.status === 'reviewing' ? '👁️ Review' : '⏸️ Pending'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="agent-task">${phase.topology || 'No topology assigned'}</div>
+                </div>
+            `).join('') || '<div class="empty-state">No agents assigned yet</div>';
+        }
+
+        document.getElementById('activity-filter').addEventListener('change', renderStoryPhase);
+
+        // ═══════════════════════════════════════
+        // RENDER: Phase Detail — Fetches real artifacts
+        // ═══════════════════════════════════════
+        async function renderPhaseDetail() {
+            const phase = findPhase(state.phaseId);
+            if (!phase) return;
+
+            // Fetch artifacts from API
+            const artifacts = document.getElementById('artifact-list');
+            try {
+                const res = await fetch('/api/artifacts/' + state.phaseId);
+                const data = res.ok ? await res.json() : { artifacts: [] };
+                const artifactList = data.artifacts || [];
+                if (artifactList.length === 0) {
+                    artifacts.innerHTML = '<div class="empty-state">No artifacts yet</div>';
+                } else {
+                    artifacts.innerHTML = artifactList.map(a => `
+                        <div class="artifact-item">
+                            <div class="artifact-icon">📄</div>
+                            <div class="artifact-info">
+                                <div class="artifact-name">${a.artifact_type || 'File'}</div>
+                                <div class="artifact-meta">${a.file_path || ''} · ${a.summary || 'No summary'}</div>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                artifacts.innerHTML = '<div class="empty-state">Could not load artifacts</div>';
+            }
+
+            // Letters from activity data
+            const letters = document.getElementById('letter-list');
+            const activity = (state.storyData && state.storyData.activity) || [];
+            const letterActivity = activity.filter(a => a.action_type === 'letter' || a.action_type === 'message');
+            if (letterActivity.length === 0) {
+                letters.innerHTML = '<div class="empty-state">No letters yet</div>';
+            } else {
+                letters.innerHTML = letterActivity.map(l => `
+                    <div class="letter-item" data-from="${(l.actor_id || 'agent').toLowerCase().replace(/[^a-z0-9]/g, '-')}">
+                        <div class="letter-header">
+                            <span class="letter-from">🤖 ${l.actor_id || 'Agent'}</span>
+                            <span class="letter-time">${new Date(l.timestamp).toLocaleTimeString()}</span>
+                        </div>
+                        <div class="letter-body">${typeof l.payload === 'string' ? l.payload : JSON.stringify(l.payload)}</div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function showPhaseDetail(phaseId) {
+            state.phaseId = phaseId;
+            navigateTo('detail', { phaseId });
+        }
+
+        // Detail tabs
+        document.querySelectorAll('.detail-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                document.querySelectorAll('.detail-panel').forEach(p => p.classList.remove('active'));
+                document.getElementById(`panel-${tab.dataset.tab}`).classList.add('active');
+            });
+        });
+
+        // ═══════════════════════════════════════
+        // TOAST SYSTEM
+        // ═══════════════════════════════════════
+        function showToast(title, message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <div class="toast-title">${type === 'error' ? '❌' : type === 'success' ? '✅' : type === 'warning' ? '⚠️' : 'ℹ️'} ${title}</div>
+                <div class="toast-message">${message}</div>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 5000);
+        }
+
+        // ═══════════════════════════════════════
+        // COMMAND PALETTE
+        // ═══════════════════════════════════════
+        function openCommandPalette() {
+            document.getElementById('cmd-palette').classList.add('visible');
+            document.getElementById('cmd-input').value = '';
+            document.getElementById('cmd-input').focus();
+            updateCommandPalette('');
+        }
+
+        function closeCommandPalette() {
+            document.getElementById('cmd-palette').classList.remove('visible');
+        }
+
+        function updateCommandPalette(query) {
+            const results = document.getElementById('cmd-results');
+            const items = [];
+
+            // Epics
+            state.data.epics.forEach(e => {
+                items.push({ icon: '🏗️', label: e.name, shortcut: 'Epic', action: () => { navigateTo('epics'); toggleEpic(e.id); } });
+                e.stories.forEach(s => {
+                    items.push({ icon: '⚡', label: s.name, shortcut: `Story in ${e.name}`, action: () => navigateTo('story', { storyId: s.id }) });
+                });
+            });
+
+            // Commands
+            items.push({ icon: '🏠', label: 'Go to Overview', shortcut: 'Cmd+1', action: () => navigateTo('overview') });
+            items.push({ icon: '📋', label: 'Go to Epic Board', shortcut: 'Cmd+2', action: () => navigateTo('epics') });
+
+            const filtered = query ? items.filter(i => i.label.toLowerCase().includes(query.toLowerCase())) : items.slice(0, 8);
+
+            results.innerHTML = filtered.map((item, i) => `
+                <div class="cmd-result ${i === 0 ? 'selected' : ''}" data-index="${i}" onclick="executeCommand(${items.indexOf(item)})">
+                    <span class="cmd-result-icon">${item.icon}</span>
+                    <span class="cmd-result-label">${item.label}</span>
+                    <span class="cmd-result-shortcut">${item.shortcut}</span>
+                </div>
+            `).join('');
+        }
+
+        document.getElementById('cmd-input').addEventListener('input', e => updateCommandPalette(e.target.value));
+        document.getElementById('cmd-palette').addEventListener('click', e => {
+            if (e.target === document.getElementById('cmd-palette')) closeCommandPalette();
+        });
+
+        // ═══════════════════════════════════════
+        // SSE CONNECTION
+        // ═══════════════════════════════════════
+        let evtSource;
+
+        function connectSSE() {
+            evtSource = new EventSource('/events');
+
+            evtSource.onopen = () => {
+                state.sseConnected = true;
+                document.getElementById('disconnect-banner').classList.remove('visible');
+                state.reconnectDelay = 3000;
+            };
+
+            evtSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleSSEEvent(data);
+                } catch (e) { console.error('SSE parse error:', e); }
+            };
+
+            evtSource.onerror = () => {
+                evtSource.close();
+                state.sseConnected = false;
+                showDisconnectBanner();
+                setTimeout(connectSSE, state.reconnectDelay);
+                state.reconnectDelay = Math.min(state.reconnectDelay * 2, 30000);
+            };
+        }
+
+        function showDisconnectBanner() {
+            const banner = document.getElementById('disconnect-banner');
+            banner.classList.add('visible');
+            let timer = Math.ceil(state.reconnectDelay / 1000);
+            document.getElementById('reconnect-timer').textContent = timer;
+            const interval = setInterval(() => {
+                timer--;
+                document.getElementById('reconnect-timer').textContent = timer;
+                if (timer <= 0) clearInterval(interval);
+            }, 1000);
+        }
+
+        function handleSSEEvent(data) {
+            switch(data.type) {
+                case 'phase_needs_approval':
+                    showToast('Phase needs approval', data.phase_name, 'warning');
+                    break;
+                case 'agent_error':
+                    showToast('Agent error', `${data.persona_id}: ${data.error}`, 'error');
+                    break;
+                case 'activity':
+                    // Prepend to activity stream if on story page
+                    break;
+            }
+        }
+
+        // ═══════════════════════════════════════
+        // KEYBOARD SHORTCUTS
+        // ═══════════════════════════════════════
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                closeCommandPalette();
+            }
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                openCommandPalette();
+            }
+            if (e.key === '?' && !e.metaKey && !e.ctrlKey) {
+                showToast('Keyboard Shortcuts', 'j/k: navigate, Enter: select, Esc: back, a: approve, r: request changes, p: pause, /: search', 'info');
+            }
+            if (state.screen === 'story') {
+                if (e.key === 'a' && !e.metaKey) document.getElementById('btn-approve').click();
+                if (e.key === 'r' && !e.metaKey) document.getElementById('btn-request').click();
+                if (e.key === 'p' && !e.metaKey) document.getElementById('btn-pause').click();
+            }
+        });
+
+        // ═══════════════════════════════════════
+        // FETCH DATA — Load real data from backend
+        // ═══════════════════════════════════════
+        async function fetchData() {
+            try {
+                const [tasksRes, statusRes] = await Promise.all([
+                    fetch('/api/tasks'),
+                    fetch('/api/status')
+                ]);
+                const tasks = tasksRes.ok ? await tasksRes.json() : { tasks: [] };
+                const status = statusRes.ok ? await statusRes.json() : {};
+                
+                // Transform backend tasks to dashboard epic format
+                if (tasks.tasks && tasks.tasks.length > 0) {
+                    state.data.epics = tasks.tasks.map((t, i) => ({
+                        id: 'epic-' + (t.id || i),
+                        name: t.name || 'Untitled Task',
+                        progress: t.progress || 0,
+                        story_count: t.story_count || 1,
+                        completed_stories: t.completed_stories || 0,
+                        duration: t.duration || 'TBD',
+                        status: t.status || 'active',
+                        stories: [{
+                            id: 'story-' + (t.id || i),
+                            name: t.name || 'Story',
+                            status: t.status || 'pending',
+                            duration: t.duration || '15m',
+                            blocker: null
+                        }]
+                    }));
+                } else {
+                    state.data.epics = [];
+                }
+                
+                // Build attention items from status
+                const attention = [];
+                if (status.tasks_total > 0) {
+                    attention.push({
+                        icon: '📋',
+                        title: status.tasks_total + ' task' + (status.tasks_total > 1 ? 's' : '') + ' in system',
+                        meta: status.status || 'operational',
+                        actions: [{ label: 'View', class: 'btn-ghost' }]
+                    });
+                }
+                if (status.letters_total > 0) {
+                    attention.push({
+                        icon: '💬',
+                        title: status.letters_total + ' letter' + (status.letters_total > 1 ? 's' : '') + ' exchanged',
+                        meta: 'Agent communications',
+                        actions: [{ label: 'View', class: 'btn-ghost' }]
+                    });
+                }
+                if (attention.length === 0) {
+                    attention.push({
+                        icon: '✅',
+                        title: 'System ready',
+                        meta: 'Create your first task to get started',
+                        actions: [{ label: 'Create Task', class: 'btn-primary' }]
+                    });
+                }
+                state.data.attention = attention;
+                
+                renderOverview();
+                renderEpicBoard();
+                
+                // Update metrics from real data
+                const running = tasks.tasks ? tasks.tasks.filter(t => t.status === 'running').length : 0;
+                document.getElementById('metric-pending').textContent = tasks.tasks ? tasks.tasks.filter(t => t.status === 'queued' || t.status === 'pending').length : 0;
+                document.getElementById('metric-agents').textContent = status.letters_total || 0;
+                document.getElementById('metric-running').textContent = running;
+                document.getElementById('metric-velocity').textContent = running > 0 ? '1.0x' : '0.0x';
+            } catch (e) {
+                console.error('fetchData error:', e);
+                showToast('Connection Error', 'Could not fetch live data. Showing cached.', 'warning');
+            }
+        }
+
+        // ═══════════════════════════════════════
+        // TASK CREATION — Chat with the swarm
+        // ═══════════════════════════════════════
+        async function createTask() {
+            const input = document.getElementById('task-input');
+            const name = input.value.trim();
+            if (!name) {
+                showToast('Error', 'Enter a task name first', 'error');
+                return;
+            }
+            const btn = document.getElementById('btn-create-task');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Creating...';
+            try {
+                const res = await fetch('/api/task/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, description: name, task_type: 'sdlc_feature' })
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                showToast('Task Created', (data.name || name) + ' — ID: ' + (data.task_id || 'ok'), 'success');
+                input.value = '';
+                fetchData();
+            } catch (e) {
+                showToast('Create Failed', e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '⚡ Create Task';
+            }
+        }
+
+        function handleAttentionAction(itemIdx, actionIdx) {
+            const item = state.data.attention[itemIdx];
+            const action = item.actions[actionIdx];
+            if (!action) return;
+            if (action.label.indexOf('Review') >= 0 || action.label.indexOf('Approve') >= 0) {
+                navigateTo('epics');
+                showToast('Navigate', 'Opening epic board for review', 'info');
+            } else if (action.label.indexOf('Start') >= 0) {
+                showToast('Start', 'Starting phase execution...', 'info');
+            } else if (action.label.indexOf('View') >= 0) {
+                navigateTo('epics');
+            } else {
+                showToast('Action', action.label + ' — coming soon', 'info');
+            }
+        }
+
+        document.getElementById('btn-create-task').addEventListener('click', createTask);
+        document.getElementById('task-input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') createTask();
+        });
+
+        // ═══════════════════════════════════════
+        // MOCK MODE
+        // ═══════════════════════════════════════
+        function toggleMockMode() {
+            state.mockMode = !state.mockMode;
+            document.getElementById('mock-badge').classList.toggle('visible', state.mockMode);
+            if (state.mockMode) {
+                state.data.epics = MOCK.epics;
+                state.data.attention = MOCK.attention;
+                showToast('Mock Mode', 'Using sample data for visual testing', 'info');
+                renderOverview();
+                renderEpicBoard();
+            } else {
+                fetchData();
+                showToast('Live Mode', 'Fetching real data from swarm...', 'info');
+            }
+        }
+
+        document.getElementById('btn-mock').addEventListener('click', toggleMockMode);
+
+        // ═══════════════════════════════════════
+        // STORY DATA LOADING — Fetch real data from APIs
+        // ═══════════════════════════════════════
+        async function loadStoryData(storyId) {
+            try {
+                const [phasesRes, activityRes] = await Promise.all([
+                    fetch('/api/phases/' + storyId),
+                    fetch('/api/activity/' + storyId)
+                ]);
+                const phases = phasesRes.ok ? await phasesRes.json() : { phases: [] };
+                const activity = activityRes.ok ? await activityRes.json() : { activity: [] };
+                state.storyData = {
+                    phases: phases.phases || [],
+                    activity: activity.activity || []
+                };
+            } catch (e) {
+                console.error('loadStoryData error:', e);
+            }
+        }
+
+        // ═══════════════════════════════════════
+        // PHASE ACTIONS — Wire to real backend APIs
+        // ═══════════════════════════════════════
+        async function approvePhase(phaseId) {
+            try {
+                const res = await fetch('/api/phase/' + phaseId + '/approve', { method: 'POST' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                showToast('Approved', data.phase_name + ' approved', 'success');
+                loadStoryData(state.storyId);
+            } catch (e) {
+                showToast('Approve Failed', e.message, 'error');
+            }
+        }
+
+        async function rejectPhase(phaseId) {
+            try {
+                const res = await fetch('/api/phase/' + phaseId + '/reject', { method: 'POST' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                showToast('Rejected', data.phase_name + ' rejected — replanning', 'warning');
+                loadStoryData(state.storyId);
+            } catch (e) {
+                showToast('Reject Failed', e.message, 'error');
+            }
+        }
+
+        async function blockPhase(phaseId) {
+            try {
+                const res = await fetch('/api/phase/' + phaseId + '/block', { method: 'POST' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const data = await res.json();
+                showToast('Paused', data.phase_name + ' paused', 'warning');
+                loadStoryData(state.storyId);
+            } catch (e) {
+                showToast('Pause Failed', e.message, 'error');
+            }
+        }
+
+        // ═══════════════════════════════════════
+        // ACTION BAR BUTTONS — Wired to real APIs
+        // ═══════════════════════════════════════
+        document.getElementById('btn-approve').addEventListener('click', () => {
+            const activePhase = state.storyData && state.storyData.phases.find(p => p.status === 'reviewing' || p.status === 'running');
+            if (activePhase) {
+                approvePhase(activePhase.id);
+            } else {
+                showToast('No Active Phase', 'No phase to approve', 'warning');
+            }
+        });
+        document.getElementById('btn-request').addEventListener('click', () => {
+            const activePhase = state.storyData && state.storyData.phases.find(p => p.status === 'reviewing' || p.status === 'running');
+            if (activePhase) {
+                rejectPhase(activePhase.id);
+            } else {
+                showToast('No Active Phase', 'No phase to reject', 'warning');
+            }
+        });
+        document.getElementById('btn-pause').addEventListener('click', () => {
+            const activePhase = state.storyData && state.storyData.phases.find(p => p.status === 'running');
+            if (activePhase) {
+                blockPhase(activePhase.id);
+            } else {
+                showToast('No Running Phase', 'No phase to pause', 'warning');
+            }
+        });
+
+        document.getElementById('btn-new-epic').addEventListener('click', () => {
+            document.getElementById('task-input').focus();
+            showToast('Tip', 'Type a task name in the overview page and hit Enter', 'info');
+            navigateTo('overview');
+        });
+
+        document.getElementById('btn-help').addEventListener('click', () => {
+            showToast('Keyboard Shortcuts', 'j/k: navigate, Enter: select, Esc: back, a: approve, r: request changes, p: pause, /: search, Cmd+K: command palette', 'info');
+        });
+
+        // ═══════════════════════════════════════
+        // UTILITY — Search real data, not mock
+        // ═══════════════════════════════════════
+        function findStory(storyId) {
+            for (const epic of state.data.epics) {
+                const story = epic.stories.find(s => s.id === storyId);
+                if (story) return { ...story, epicName: epic.name };
+            }
+            return null;
+        }
+
+        function findPhase(phaseId) {
+            if (!state.storyData || !state.storyData.phases) return null;
+            return state.storyData.phases.find(p => p.id === phaseId);
+        }
+
+        // ═══════════════════════════════════════
+        // INIT — Fetch real data first, mock only on explicit toggle
+        // ═══════════════════════════════════════
+        fetchData();
+        connectSSE();
+
+        // If URL has hash, navigate there
+        if (window.location.hash === '#epics') navigateTo('epics');
+    </script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+[package]
+name = "openclaw-swarm"
+version = "0.1.0"
+edition = "2021"
+authors = ["Shadab <s.shadab.dav9@gmail.com>", "Ayan (OpenClaw)"]
+description = "Agent swarm engine with personality-driven MxN matrix architecture"
+license = "MIT"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.43", features = ["full", "rt-multi-thread"] }
+
+# Web server (for real-time dashboard)
+axum = "0.8"
+tower-http = { version = "0.6", features = ["fs", "cors"] }
+tokio-stream = "0.1"
+async-stream = "0.3"
+urlencoding = "2.1"
+
+# Async trait support
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+serde_json = "1.0"
+
+# Database
+rusqlite = { version = "0.32", features = ["bundled", "chrono", "uuid"] }
+r2d2 = "0.8"
+r2d2_sqlite = "0.25"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# IDs
+uuid = { version = "1.15", features = ["v4", "serde"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# CLI
+clap = { version = "4.5", features = ["derive"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# HTTP (for sandbox webhooks/APIs)
+reqwest = { version = "0.12", features = ["json", "blocking"] }
+
+# TODO(Mon): Uncomment for BigQuery adapter
+# google-cloud-bigquery = "0.15"
+
+# TUI dashboard
+ratatui = "0.29"
+crossterm = "0.28"
+
+[dev-dependencies]
+tokio-test = "0.4"

@@ -1,0 +1,21 @@
+/target
+*.db
+*.log
+*.db-journal
+.env
+credentials.json
+service-account*.json
+*.key
+*.pem
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Generated / cache
+graphify-out/
+workspace/
+
+# Large binaries
+docs/books/**/*.pdf
