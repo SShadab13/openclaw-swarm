@@ -1,8 +1,36 @@
 # OpenClaw Swarm
 
-**Agent swarm engine with personality-driven M×N matrix architecture.**
+**Agent swarm engine with personality-driven M×N matrix architecture — and a BigQuery data-engineering toolkit that documents warehouses in one command.**
 
 Built in Rust. Forked from the philosophy of [Pulse](https://www.instagram.com/reel/DYBSB8NsFYE/) — build the engine first, the IDE last.
+
+## BigQuery Schema Documentation (bq-doc)
+
+Point it at any BigQuery dataset, get a complete markdown schema document: every table, every column (nested RECORDs flattened to dotted names), types, modes, descriptions, partitioning, clustering, row counts.
+Metadata APIs only — zero rows read, zero query cost.
+
+```bash
+# One-time auth (no service-account key needed)
+gcloud auth application-default login
+
+# Document a dataset
+openclaw-swarm bq-doc --dataset your-project.your_dataset --out schema.md
+
+# Monitor schema changes over time
+openclaw-swarm bq-snapshot --dataset your-project.your_dataset --out monday.json
+openclaw-swarm bq-diff --old monday.json --new friday.json --out changes.md
+```
+
+### Live samples (generated from free public datasets)
+
+| Niche | Sample | Tables |
+|-------|--------|--------|
+| E-commerce | [thelook_ecommerce](docs/demo/thelook_ecommerce.md) | 8 |
+| Healthcare | [cms_medicare](docs/demo/cms_medicare.md) | 23 |
+| Crypto / fintech | [crypto_bitcoin](docs/demo/crypto_bitcoin.md) — nested RECORDs flattened | 4 |
+| Logistics | [new_york_taxi_trips](docs/demo/new_york_taxi_trips.md) | 27 |
+
+Want your warehouse documented like this? Read [client onboarding](docs/client/onboarding.md) (10-minute read-only setup, revocable anytime) and the [data handling policy](docs/client/data-handling.md) (metadata-only by default — your data rows are never read).
 
 ## Philosophy
 

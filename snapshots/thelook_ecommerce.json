@@ -1,0 +1,697 @@
+[
+  {
+    "dataset_id": "thelook_ecommerce",
+    "table_id": "distribution_centers",
+    "columns": [
+      {
+        "name": "id",
+        "data_type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "name",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "latitude",
+        "data_type": "FLOAT",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "longitude",
+        "data_type": "FLOAT",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "distribution_center_geom",
+        "data_type": "GEOGRAPHY",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      }
+    ],
+    "partition_column": null,
+    "clustering_columns": [],
+    "num_bytes": 809,
+    "num_rows": 10,
+    "last_modified": "2026-07-05T03:46:11.392Z",
+    "description": "The Look fictitious e-commerce dataset: distribution_centers table"
+  },
+  {
+    "dataset_id": "thelook_ecommerce",
+    "table_id": "events",
+    "columns": [
+      {
+        "name": "id",
+        "data_type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "user_id",
+        "data_type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "sequence_number",
+        "data_type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "session_id",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "created_at",
+        "data_type": "TIMESTAMP",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "ip_address",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "city",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "state",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "postal_code",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "browser",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "traffic_source",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "uri",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "event_type",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      }
+    ],
+    "partition_column": null,
+    "clustering_columns": [],
+    "num_bytes": 385582409,
+    "num_rows": 2428234,
+    "last_modified": "2026-07-05T03:45:50.234Z",
+    "description": "Programatically generated web events for The Look fictitious e-commerce store"
+  },
+  {
+    "dataset_id": "thelook_ecommerce",
+    "table_id": "inventory_items",
+    "columns": [
+      {
+        "name": "id",
+        "data_type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "product_id",
+        "data_type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "created_at",
+        "data_type": "TIMESTAMP",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "sold_at",
+        "data_type": "TIMESTAMP",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "cost",
+        "data_type": "FLOAT",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "product_category",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "product_name",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "product_brand",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "product_retail_price",
+        "data_type": "FLOAT",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "product_department",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "product_sku",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "product_distribution_center_id",
+        "data_type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      }
+    ],
+    "partition_column": null,
+    "clustering_columns": [],
+    "num_bytes": 81218117,
+    "num_rows": 489747,
+    "last_modified": "2026-07-05T03:45:53.196Z",
+    "description": "Programatically generated inventory for The Look fictitious e-commerce store"
+  },
+  {
+    "dataset_id": "thelook_ecommerce",
+    "table_id": "order_items",
+    "columns": [
+      {
+        "name": "id",
+        "data_type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "order_id",
+        "data_type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "user_id",
+        "data_type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "product_id",
+        "data_type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "inventory_item_id",
+        "data_type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "status",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "created_at",
+        "data_type": "TIMESTAMP",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "shipped_at",
+        "data_type": "TIMESTAMP",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "delivered_at",
+        "data_type": "TIMESTAMP",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "returned_at",
+        "data_type": "TIMESTAMP",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "sale_price",
+        "data_type": "FLOAT",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      }
+    ],
+    "partition_column": null,
+    "clustering_columns": [],
+    "num_bytes": 13617243,
+    "num_rows": 181459,
+    "last_modified": "2026-07-05T03:45:44.298Z",
+    "description": "Programatically generated order items for The Look fictitious e-commerce store"
+  },
+  {
+    "dataset_id": "thelook_ecommerce",
+    "table_id": "orders",
+    "columns": [
+      {
+        "name": "order_id",
+        "data_type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "user_id",
+        "data_type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "status",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "gender",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "created_at",
+        "data_type": "TIMESTAMP",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "returned_at",
+        "data_type": "TIMESTAMP",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "shipped_at",
+        "data_type": "TIMESTAMP",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "delivered_at",
+        "data_type": "TIMESTAMP",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "num_of_item",
+        "data_type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      }
+    ],
+    "partition_column": null,
+    "clustering_columns": [],
+    "num_bytes": 6756516,
+    "num_rows": 124989,
+    "last_modified": "2026-07-05T03:45:44.887Z",
+    "description": "Programatically generated orders for The Look fictitious e-commerce store"
+  },
+  {
+    "dataset_id": "thelook_ecommerce",
+    "table_id": "products",
+    "columns": [
+      {
+        "name": "id",
+        "data_type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "cost",
+        "data_type": "FLOAT",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "category",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "name",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "brand",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "retail_price",
+        "data_type": "FLOAT",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "department",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "sku",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "distribution_center_id",
+        "data_type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      }
+    ],
+    "partition_column": null,
+    "clustering_columns": [],
+    "num_bytes": 4285975,
+    "num_rows": 29120,
+    "last_modified": "2026-07-05T03:45:46.073Z",
+    "description": "The Look fictitious e-commerce dataset - products table"
+  },
+  {
+    "dataset_id": "thelook_ecommerce",
+    "table_id": "thelook_ecommerce-table",
+    "columns": [],
+    "partition_column": null,
+    "clustering_columns": [],
+    "num_bytes": 0,
+    "num_rows": 0,
+    "last_modified": "2026-04-09T14:02:58.710Z",
+    "description": null
+  },
+  {
+    "dataset_id": "thelook_ecommerce",
+    "table_id": "users",
+    "columns": [
+      {
+        "name": "id",
+        "data_type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "first_name",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "last_name",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "email",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "age",
+        "data_type": "INTEGER",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "gender",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "state",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "street_address",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "postal_code",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "city",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "country",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "latitude",
+        "data_type": "FLOAT",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "longitude",
+        "data_type": "FLOAT",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "traffic_source",
+        "data_type": "STRING",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "created_at",
+        "data_type": "TIMESTAMP",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      },
+      {
+        "name": "user_geom",
+        "data_type": "GEOGRAPHY",
+        "mode": "NULLABLE",
+        "description": null,
+        "is_partitioned": false,
+        "is_clustered": false
+      }
+    ],
+    "partition_column": null,
+    "clustering_columns": [],
+    "num_bytes": 19815107,
+    "num_rows": 100000,
+    "last_modified": "2026-07-05T03:46:05.278Z",
+    "description": "Programatically generated users for The Look fictitious e-commerce store"
+  }
+]

@@ -165,6 +165,86 @@ enum Commands {
         #[arg(long)]
         credentials: Option<String>,
     },
+
+    /// Snapshot a dataset's schemas to JSON (for change monitoring)
+    BqSnapshot {
+        /// Dataset reference: "project.dataset"
+        #[arg(long)]
+        dataset: String,
+
+        /// Output JSON file path
+        #[arg(long)]
+        out: String,
+
+        /// Service-account JSON key path (falls back to BQ_CREDENTIALS_PATH env var)
+        #[arg(long)]
+        credentials: Option<String>,
+    },
+
+    /// Diff two schema snapshots into a markdown changelog
+    BqDiff {
+        /// Older snapshot JSON
+        #[arg(long)]
+        old: String,
+
+        /// Newer snapshot JSON
+        #[arg(long)]
+        new: String,
+
+        /// Output markdown path (stdout if omitted)
+        #[arg(long)]
+        out: Option<String>,
+    },
+}
+
+/// Authenticate and fetch every table schema in a dataset.
+async fn fetch_dataset_schemas(
+    dataset: &str,
+    credentials: Option<String>,
+) -> Result<(String, String, Vec<openclaw_swarm::adapters::bq_adapter::BqTableSchema>)> {
+    use openclaw_swarm::adapters::bq_adapter::{BigQueryAdapter, BqAdapterLive, BqConfig};
+
+    let credentials_path = credentials
+        .or_else(|| std::env::var("BQ_CREDENTIALS_PATH").ok())
+        .unwrap_or_default();
+    if credentials_path.is_empty() {
+        info!("No key file given - using Application Default Credentials \
+               (run `gcloud auth application-default login` once)");
+    }
+
+    let (project, dataset_id) = dataset
+        .split_once(['.', ':'])
+        .filter(|(p, d)| !p.is_empty() && !d.is_empty())
+        .ok_or_else(|| anyhow::anyhow!(
+            "Invalid dataset ref '{}': expected project.dataset", dataset))?;
+
+    let config = BqConfig {
+        project_id: project.to_string(),
+        credentials_path,
+        ..Default::default()
+    };
+
+    let mut adapter = BqAdapterLive::new();
+    adapter.authenticate(&config).await?;
+
+    let tables = adapter.list_tables(dataset_id).await?;
+    info!("Dataset {}.{}: {} tables", project, dataset_id, tables.len());
+
+    let mut schemas = Vec::new();
+    for table in &tables {
+        let table_ref = format!("{}.{}.{}", project, dataset_id, table);
+        info!("Fetching schema: {}", table_ref);
+        schemas.push(adapter.get_schema(&table_ref).await?);
+    }
+    Ok((project.to_string(), dataset_id.to_string(), schemas))
+}
+
+fn write_with_parents(path: &str, content: &str) -> Result<()> {
+    if let Some(parent) = std::path::Path::new(path).parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(path, content)?;
+    Ok(())
 }
 
 #[tokio::main]
@@ -342,47 +422,34 @@ async fn main() -> Result<()> {
         }
 
         Commands::BqDoc { dataset, out, credentials } => {
-            use openclaw_swarm::adapters::bq_adapter::{BigQueryAdapter, BqAdapterLive, BqConfig};
-
-            let credentials_path = credentials
-                .or_else(|| std::env::var("BQ_CREDENTIALS_PATH").ok())
-                .unwrap_or_default();
-            if credentials_path.is_empty() {
-                info!("No key file given - using Application Default Credentials \
-                       (run `gcloud auth application-default login` once)");
-            }
-
-            let (project, dataset_id) = dataset
-                .split_once(['.', ':'])
-                .filter(|(p, d)| !p.is_empty() && !d.is_empty())
-                .ok_or_else(|| anyhow::anyhow!(
-                    "Invalid dataset ref '{}': expected project.dataset", dataset))?;
-
-            let config = BqConfig {
-                project_id: project.to_string(),
-                credentials_path,
-                ..Default::default()
-            };
-
-            let mut adapter = BqAdapterLive::new();
-            adapter.authenticate(&config).await?;
-
-            let tables = adapter.list_tables(dataset_id).await?;
-            info!("Dataset {}.{}: {} tables", project, dataset_id, tables.len());
-
-            let mut schemas = Vec::new();
-            for table in &tables {
-                let table_ref = format!("{}.{}.{}", project, dataset_id, table);
-                info!("Fetching schema: {}", table_ref);
-                schemas.push(adapter.get_schema(&table_ref).await?);
-            }
-
-            let doc = openclaw_swarm::bq_doc::render_dataset_doc(project, dataset_id, &schemas);
-            if let Some(parent) = std::path::Path::new(&out).parent() {
-                std::fs::create_dir_all(parent)?;
-            }
-            std::fs::write(&out, &doc)?;
+            let (project, dataset_id, schemas) =
+                fetch_dataset_schemas(&dataset, credentials).await?;
+            let doc = openclaw_swarm::bq_doc::render_dataset_doc(&project, &dataset_id, &schemas);
+            write_with_parents(&out, &doc)?;
             info!("Schema doc written: {} ({} tables, {} bytes)", out, schemas.len(), doc.len());
+        }
+
+        Commands::BqSnapshot { dataset, out, credentials } => {
+            let (_, _, schemas) = fetch_dataset_schemas(&dataset, credentials).await?;
+            let json = serde_json::to_string_pretty(&schemas)?;
+            write_with_parents(&out, &json)?;
+            info!("Snapshot written: {} ({} tables)", out, schemas.len());
+        }
+
+        Commands::BqDiff { old, new, out } => {
+            use openclaw_swarm::adapters::bq_adapter::BqTableSchema;
+            let old_schemas: Vec<BqTableSchema> =
+                serde_json::from_str(&std::fs::read_to_string(&old)?)?;
+            let new_schemas: Vec<BqTableSchema> =
+                serde_json::from_str(&std::fs::read_to_string(&new)?)?;
+            let diff = openclaw_swarm::bq_doc::render_schema_diff(&old_schemas, &new_schemas);
+            match out {
+                Some(path) => {
+                    write_with_parents(&path, &diff)?;
+                    info!("Changelog written: {}", path);
+                }
+                None => println!("{}", diff),
+            }
         }
     }
 
