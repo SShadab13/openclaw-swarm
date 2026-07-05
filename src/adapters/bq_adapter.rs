@@ -271,7 +271,7 @@ impl BigQueryAdapter for BqAdapterLive {
         let mut page_token: Option<String> = None;
         loop {
             let mut opts =
-                gcp_bigquery_client::dataset::ListOptions::default().max_results(1000);
+                gcp_bigquery_client::table::ListOptions::default().max_results(1000);
             if let Some(t) = &page_token {
                 opts = opts.page_token(t.clone());
             }
