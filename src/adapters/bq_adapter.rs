@@ -379,18 +379,80 @@ impl BigQueryAdapter for BqAdapterLive {
     }
 
     async fn run_query(&self, sql: &str) -> Result<BqQueryResult> {
-        // TODO(Wed): Pre-flight dry-run to estimate bytes_scanned
-        // TODO(Wed): Check against config.max_bytes_scanned
-        // TODO(Wed): Execute actual query via BQ client
-        // TODO(Wed): Stream results into Vec<serde_json::Value>
-        tracing::info!("BQ run_query stub: {}", sql);
+        use gcp_bigquery_client::model::query_request::QueryRequest;
+
+        if sql.trim().is_empty() {
+            return Err(BqGuardError::EmptyQuery.into());
+        }
+        let client = self
+            .client
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Not authenticated — call authenticate() first"))?;
+        let config = self
+            .config
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No BqConfig set"))?;
+        let limit = config.max_bytes_scanned.unwrap_or(100_000_000_000);
+
+        // Guard 1: dry-run estimate before spending anything
+        let mut dry = QueryRequest::new(sql);
+        dry.dry_run = Some(true);
+        let dry_rs = client.job().query(&config.project_id, dry).await?;
+        let estimated: i64 = dry_rs
+            .query_response()
+            .total_bytes_processed
+            .as_deref()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        if estimated > limit {
+            return Err(BqGuardError::ScanLimitExceeded(estimated, limit).into());
+        }
+        tracing::info!("BQ dry-run: {} bytes estimated (limit {})", estimated, limit);
+
+        // Guard 2: server-side billing cap in case the estimate was off
+        let start = std::time::Instant::now();
+        let mut req = QueryRequest::new(sql);
+        req.maximum_bytes_billed = Some(limit.to_string());
+        let rs = client.job().query(&config.project_id, req).await?;
+        let resp = rs.query_response();
+
+        let schema = flatten_fields(
+            resp.schema.clone().and_then(|s| s.fields).unwrap_or_default(),
+            "",
+            &None,
+            &[],
+        );
+        let names: Vec<String> = schema.iter().map(|c| c.name.clone()).collect();
+        let rows = resp
+            .rows
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|r| {
+                let mut obj = serde_json::Map::new();
+                for (i, cell) in r.columns.unwrap_or_default().into_iter().enumerate() {
+                    let key = names.get(i).cloned().unwrap_or_else(|| format!("col_{}", i));
+                    obj.insert(key, cell.value.unwrap_or(serde_json::Value::Null));
+                }
+                serde_json::Value::Object(obj)
+            })
+            .collect();
+
         Ok(BqQueryResult {
-            job_id: "stub".to_string(),
+            job_id: resp
+                .job_reference
+                .as_ref()
+                .and_then(|j| j.job_id.clone())
+                .unwrap_or_default(),
             query: sql.to_string(),
-            bytes_scanned: 0,
-            rows: vec![],
-            schema: vec![],
-            execution_time_ms: 0,
+            bytes_scanned: resp
+                .total_bytes_processed
+                .as_deref()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(estimated),
+            rows,
+            schema,
+            execution_time_ms: start.elapsed().as_millis() as i64,
         })
     }
 

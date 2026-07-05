@@ -75,3 +75,59 @@ async fn test_get_schema_public_table() {
     assert_eq!(schema.dataset_id, "austin_311");
     assert!(!schema.columns.is_empty(), "Expected at least one column");
 }
+
+// The two tests below use ADC (empty credentials_path) and gate on
+// BQ_PROJECT_ID because jobs.query needs job-creation rights in a project
+// you own. Queries stay inside BigQuery's free tier.
+
+#[tokio::test]
+async fn test_run_query_guard_blocks_expensive_scan() {
+    let project = match std::env::var("BQ_PROJECT_ID") {
+        Ok(p) => p,
+        Err(_) => {
+            println!("SKIP: BQ_PROJECT_ID not set");
+            return;
+        }
+    };
+    let config = BqConfig {
+        project_id: project,
+        credentials_path: String::new(), // ADC
+        max_bytes_scanned: Some(1),      // absurdly low: everything must trip
+        ..Default::default()
+    };
+    let mut adapter = BqAdapterLive::new();
+    adapter.authenticate(&config).await.expect("authenticate() failed");
+
+    let result = adapter
+        .run_query("SELECT unique_key FROM `bigquery-public-data.austin_311.311_service_requests` LIMIT 10")
+        .await;
+    let err = format!("{:?}", result);
+    assert!(result.is_err(), "Guard should have blocked the scan");
+    assert!(err.contains("exceeds limit"), "Wrong error: {}", err);
+}
+
+#[tokio::test]
+async fn test_run_query_small_query_succeeds() {
+    let project = match std::env::var("BQ_PROJECT_ID") {
+        Ok(p) => p,
+        Err(_) => {
+            println!("SKIP: BQ_PROJECT_ID not set");
+            return;
+        }
+    };
+    let config = BqConfig {
+        project_id: project,
+        credentials_path: String::new(), // ADC
+        ..Default::default()
+    };
+    let mut adapter = BqAdapterLive::new();
+    adapter.authenticate(&config).await.expect("authenticate() failed");
+
+    let result = adapter
+        .run_query("SELECT 1 AS one, 'x' AS letter")
+        .await
+        .expect("run_query() failed");
+    assert_eq!(result.rows.len(), 1);
+    assert_eq!(result.schema.len(), 2);
+    println!("row: {:?}, scanned {} bytes, job {}", result.rows[0], result.bytes_scanned, result.job_id);
+}

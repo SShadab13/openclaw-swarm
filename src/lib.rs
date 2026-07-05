@@ -20,3 +20,4 @@ pub mod planning;
 pub mod review;
 pub mod adapters;
 pub mod bq_doc;
+pub mod bq_lint;

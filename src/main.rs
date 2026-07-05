@@ -181,6 +181,21 @@ enum Commands {
         credentials: Option<String>,
     },
 
+    /// Lint a BigQuery dataset: cost traps + documentation gaps (metadata-only)
+    BqLint {
+        /// Dataset reference: "project.dataset"
+        #[arg(long)]
+        dataset: String,
+
+        /// Output markdown path (stdout if omitted)
+        #[arg(long)]
+        out: Option<String>,
+
+        /// Service-account JSON key path (falls back to BQ_CREDENTIALS_PATH env var)
+        #[arg(long)]
+        credentials: Option<String>,
+    },
+
     /// Diff two schema snapshots into a markdown changelog
     BqDiff {
         /// Older snapshot JSON
@@ -434,6 +449,21 @@ async fn main() -> Result<()> {
             let json = serde_json::to_string_pretty(&schemas)?;
             write_with_parents(&out, &json)?;
             info!("Snapshot written: {} ({} tables)", out, schemas.len());
+        }
+
+        Commands::BqLint { dataset, out, credentials } => {
+            let (project, dataset_id, schemas) =
+                fetch_dataset_schemas(&dataset, credentials).await?;
+            let findings = openclaw_swarm::bq_lint::lint_schemas(&schemas);
+            let report = openclaw_swarm::bq_lint::render_lint_report(
+                &project, &dataset_id, schemas.len(), &findings);
+            match out {
+                Some(path) => {
+                    write_with_parents(&path, &report)?;
+                    info!("Lint report written: {} ({} findings)", path, findings.len());
+                }
+                None => println!("{}", report),
+            }
         }
 
         Commands::BqDiff { old, new, out } => {
