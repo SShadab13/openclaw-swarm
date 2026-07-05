@@ -267,18 +267,31 @@ impl BigQueryAdapter for BqAdapterLive {
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No BqConfig set"))?;
 
-        // TODO: pagination via next_page_token for datasets with >50 tables
-        let result = client
-            .table()
-            .list(&config.project_id, dataset_id, Default::default())
-            .await?;
-
-        Ok(result
-            .tables
-            .unwrap_or_default()
-            .into_iter()
-            .map(|t| t.table_reference.table_id)
-            .collect())
+        let mut tables = Vec::new();
+        let mut page_token: Option<String> = None;
+        loop {
+            let mut opts =
+                gcp_bigquery_client::dataset::ListOptions::default().max_results(1000);
+            if let Some(t) = &page_token {
+                opts = opts.page_token(t.clone());
+            }
+            let result = client
+                .table()
+                .list(&config.project_id, dataset_id, opts)
+                .await?;
+            tables.extend(
+                result
+                    .tables
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|t| t.table_reference.table_id),
+            );
+            page_token = result.next_page_token;
+            if page_token.is_none() {
+                break;
+            }
+        }
+        Ok(tables)
     }
 
     async fn get_schema(&self, table_ref: &str) -> Result<BqTableSchema> {
