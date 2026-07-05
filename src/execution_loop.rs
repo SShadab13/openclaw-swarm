@@ -9,6 +9,7 @@ use crate::sandbox::{Sandbox, SandboxRoom};
 use crate::swarm_bus::{SwarmBus, LetterStream};
 use crate::task_fsm::{TaskFsm, TaskState};
 use crate::error_journal::ErrorJournal;
+use crate::knowledge::CompositeKnowledgeSource;
 use std::time::Duration;
 use std::sync::Arc;
 use tokio::task;
@@ -32,6 +33,7 @@ async fn execute_agent_step(
     all_letters: Vec<Letter>,
     room: SandboxRoom,
     bus: Arc<tokio::sync::Mutex<SwarmBus>>,
+    knowledge_graph_path: String,
 ) -> Result<()> {
     let persona_id = assignment.persona_id.clone();
     let personality_id = assignment.personality_id.clone();
@@ -73,11 +75,21 @@ async fn execute_agent_step(
         .filter(|l| l.from_persona != persona_id)
         .collect();
 
-    // Build task-specific prompt enriched with peer context
+    // Query knowledge graph for relevant context
+    let knowledge = match CompositeKnowledgeSource::from_path(&knowledge_graph_path) {
+        Ok(k) => k,
+        Err(e) => {
+            warn!("[Agent] {} failed to load knowledge graph: {}", persona_id, e);
+            CompositeKnowledgeSource::new(crate::knowledge::ObsidianVault::from_defaults(), crate::knowledge::SqliteGraph::new(":memory:")?)
+        }
+    };
+
+    // Build task-specific prompt enriched with peer context and knowledge
     let prompt = build_prompt_with_context(
         &task_id, &persona_id, &assignment.reason,
         &task_description,
-        &peer_letters, &assignment.mood
+        &peer_letters, &assignment.mood,
+        &knowledge
     );
 
     // Execute via runner
@@ -92,8 +104,9 @@ async fn execute_agent_step(
     // Write letter based on result
     match result {
         Ok(output) => {
-            let letter_content = if output.len() > 500 {
-                format!("DONE: {}...", &output[..500])
+            let truncated = truncate_chars(&output, 500);
+            let letter_content = if truncated.len() < output.len() {
+                format!("DONE: {}...", truncated)
             } else {
                 format!("DONE: {}", output)
             };
@@ -193,6 +206,7 @@ fn build_prompt_with_context(
     task_description: &str,
     peer_letters: &[&Letter],
     mood: &str,
+    knowledge: &CompositeKnowledgeSource,
 ) -> String {
     let mut peer_context = String::new();
     if !peer_letters.is_empty() {
@@ -214,6 +228,31 @@ fn build_prompt_with_context(
         peer_context.push_str("📬 No letters from other agents yet. You are first.\n\n");
     }
 
+    // Query knowledge graph for relevant context
+    let knowledge_context = match knowledge.read(task_description) {
+        Ok(chunks) if !chunks.is_empty() => {
+            let mut ctx = String::from("🧠 Relevant knowledge from the vault:\n");
+            for chunk in chunks.iter().take(5) {
+                let preview = if chunk.content.len() > 300 {
+                    format!("{}...", &chunk.content[..300])
+                } else {
+                    chunk.content.clone()
+                };
+                ctx.push_str(&format!(
+                    "  - {} (relevance {:.2}): {}\n",
+                    chunk.source, chunk.relevance, preview
+                ));
+            }
+            ctx.push('\n');
+            ctx
+        }
+        Ok(_) => "🧠 No relevant vault knowledge found.\n\n".to_string(),
+        Err(e) => {
+            warn!("Failed to query knowledge graph: {}", e);
+            "🧠 Vault knowledge unavailable.\n\n".to_string()
+        }
+    };
+
     format!(
         "You are the '{}' persona in the OpenClaw Swarm.\n\
         Task ID: {}\n\
@@ -223,14 +262,14 @@ fn build_prompt_with_context(
         TASK DESCRIPTION: {}\n\
         \n\
         {}\
-        Your assignment: {}\n\
+        {}\n        Your assignment: {}\n\
         \n\
         Execute this task using your skills. Write code to files when appropriate.\n\
         Report DONE when complete.\n\
         If blocked by something another agent is responsible for, report BLOCKING with reason.\n\
         If you need to ask another agent a question, mention their persona name.\n\
         Keep your response concise (max 1000 chars) to save tokens.",
-        persona_id, task_id, persona_id, mood, task_description, peer_context, reason
+        persona_id, task_id, persona_id, mood, task_description, peer_context, knowledge_context, reason
     )
 }
 
@@ -269,6 +308,7 @@ pub struct ExecutionLoop {
     sandbox: Sandbox,
     bus: Arc<tokio::sync::Mutex<SwarmBus>>,
     fsm: TaskFsm,
+    knowledge_graph_path: String,
 }
 
 impl ExecutionLoop {
@@ -285,6 +325,8 @@ impl ExecutionLoop {
         let sandbox = Sandbox::new("main", workspace);
         let bus = Arc::new(tokio::sync::Mutex::new(SwarmBus::new()));
         let fsm = TaskFsm::new(db_path)?;
+        let knowledge_graph_path = std::env::var("OPENCLAW_KNOWLEDGE_GRAPH")
+            .unwrap_or_else(|_| "./knowledge_graph.db".to_string());
 
         Ok(Self {
             db,
@@ -295,6 +337,7 @@ impl ExecutionLoop {
             sandbox,
             bus,
             fsm,
+            knowledge_graph_path,
         })
     }
 
@@ -344,9 +387,10 @@ impl ExecutionLoop {
                 status: room.status.clone(),
             };
             let bus = Arc::clone(&self.bus);
+            let knowledge_graph_path = self.knowledge_graph_path.clone();
 
             let handle = task::spawn(async move {
-                execute_agent_step(db, runners, workspace, task_id, task_description, assignment, letters, room, bus).await
+                execute_agent_step(db, runners, workspace, task_id, task_description, assignment, letters, room, bus, knowledge_graph_path).await
             });
             handles.push(handle);
         }
@@ -474,5 +518,32 @@ impl ExecutionLoop {
         }
 
         Ok(())
+    }
+}
+
+/// Truncate to at most `max_chars` characters without splitting a UTF-8 char.
+/// Plain byte slicing (`&s[..500]`) panics on multibyte boundaries.
+fn truncate_chars(s: &str, max_chars: usize) -> &str {
+    match s.char_indices().nth(max_chars) {
+        Some((idx, _)) => &s[..idx],
+        None => s,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::truncate_chars;
+
+    #[test]
+    fn test_truncate_chars_multibyte_no_panic() {
+        let s = "✨".repeat(600); // 600 chars, 1800 bytes — byte slice at 500 would panic
+        let t = truncate_chars(&s, 500);
+        assert_eq!(t.chars().count(), 500);
+    }
+
+    #[test]
+    fn test_truncate_chars_short_string_unchanged() {
+        assert_eq!(truncate_chars("abc", 500), "abc");
+        assert_eq!(truncate_chars("", 500), "");
     }
 }
