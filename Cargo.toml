@@ -50,12 +50,20 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # HTTP (for sandbox webhooks/APIs)
 reqwest = { version = "0.12", features = ["json", "blocking"] }
 
-# TODO(Mon): Uncomment for BigQuery adapter
-# google-cloud-bigquery = "0.15"
+# BigQuery adapter
+gcp-bigquery-client = "0.18"
 
 # TUI dashboard
 ratatui = "0.29"
 crossterm = "0.28"
 
+# Knowledge graph database (replaced with SQLite-as-graph; see wiki)
+# kuzu was archived Oct 2025; do not re-add.
+
+[[bin]]
+name = "vault-compiler"
+path = "src/bin/vault_compiler.rs"
+
 [dev-dependencies]
 tokio-test = "0.4"
+tempfile = "3"
