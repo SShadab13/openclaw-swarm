@@ -45,3 +45,33 @@ async fn test_list_bigquery_public_datasets() {
     }
     assert!(!datasets.is_empty(), "Expected at least one dataset");
 }
+
+#[tokio::test]
+async fn test_get_schema_public_table() {
+    let creds = match std::env::var("BQ_CREDENTIALS_PATH") {
+        Ok(p) => p,
+        Err(_) => {
+            println!("SKIP: BQ_CREDENTIALS_PATH not set");
+            return;
+        }
+    };
+    let project = std::env::var("BQ_PROJECT_ID").expect("BQ_PROJECT_ID must be set with creds");
+
+    let config = BqConfig {
+        project_id: project,
+        credentials_path: creds,
+        ..Default::default()
+    };
+
+    let mut adapter = BqAdapterLive::new();
+    adapter.authenticate(&config).await.expect("authenticate() failed");
+
+    let schema = adapter
+        .get_schema("bigquery-public-data.austin_311.311_service_requests")
+        .await
+        .expect("get_schema() failed");
+
+    println!("Table {} has {} columns", schema.table_id, schema.columns.len());
+    assert_eq!(schema.dataset_id, "austin_311");
+    assert!(!schema.columns.is_empty(), "Expected at least one column");
+}

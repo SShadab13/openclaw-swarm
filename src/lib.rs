@@ -1,5 +1,6 @@
 pub mod models;
 pub mod db;
+pub mod knowledge;
 pub mod persona_loader;
 pub mod queen;
 pub mod coordinator;
@@ -18,3 +19,4 @@ pub mod activity;
 pub mod planning;
 pub mod review;
 pub mod adapters;
+pub mod bq_doc;

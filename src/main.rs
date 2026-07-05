@@ -150,6 +150,21 @@ enum Commands {
         #[arg(short, long, default_value = "8080")]
         port: u16,
     },
+
+    /// Generate markdown schema documentation for a BigQuery dataset
+    BqDoc {
+        /// Dataset reference: "project.dataset" or "project:dataset"
+        #[arg(long)]
+        dataset: String,
+
+        /// Output markdown file path
+        #[arg(long)]
+        out: String,
+
+        /// Service-account JSON key path (falls back to BQ_CREDENTIALS_PATH env var)
+        #[arg(long)]
+        credentials: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -325,7 +340,48 @@ async fn main() -> Result<()> {
             );
             dashboard.run(port).await?;
         }
+
+        Commands::BqDoc { dataset, out, credentials } => {
+            use openclaw_swarm::adapters::bq_adapter::{BigQueryAdapter, BqAdapterLive, BqConfig};
+
+            let credentials_path = credentials
+                .or_else(|| std::env::var("BQ_CREDENTIALS_PATH").ok())
+                .ok_or_else(|| anyhow::anyhow!(
+                    "No credentials: pass --credentials or set BQ_CREDENTIALS_PATH"))?;
+
+            let (project, dataset_id) = dataset
+                .split_once(['.', ':'])
+                .filter(|(p, d)| !p.is_empty() && !d.is_empty())
+                .ok_or_else(|| anyhow::anyhow!(
+                    "Invalid dataset ref '{}': expected project.dataset", dataset))?;
+
+            let config = BqConfig {
+                project_id: project.to_string(),
+                credentials_path,
+                ..Default::default()
+            };
+
+            let mut adapter = BqAdapterLive::new();
+            adapter.authenticate(&config).await?;
+
+            let tables = adapter.list_tables(dataset_id).await?;
+            info!("Dataset {}.{}: {} tables", project, dataset_id, tables.len());
+
+            let mut schemas = Vec::new();
+            for table in &tables {
+                let table_ref = format!("{}.{}.{}", project, dataset_id, table);
+                info!("Fetching schema: {}", table_ref);
+                schemas.push(adapter.get_schema(&table_ref).await?);
+            }
+
+            let doc = openclaw_swarm::bq_doc::render_dataset_doc(project, dataset_id, &schemas);
+            if let Some(parent) = std::path::Path::new(&out).parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::write(&out, &doc)?;
+            info!("Schema doc written: {} ({} tables, {} bytes)", out, schemas.len(), doc.len());
+        }
     }
-    
+
     Ok(())
 }

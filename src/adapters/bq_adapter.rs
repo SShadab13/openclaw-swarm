@@ -1,16 +1,10 @@
 //! BigQuery Adapter — Data Engineering Persona Interface
 //!
-//! Stub for week 1. Implements:
-//! - Service account auth
-//! - Dataset/schema discovery
-//! - Query execution with cost guardrails
-//! - Audit log access for lineage extraction
+//! Implemented: service-account auth, list_datasets(), list_tables(), get_schema().
 //!
-//! TODO (Mon): Add `google-cloud-bigquery` crate to Cargo.toml
-//! TODO (Mon): Implement auth from service-account JSON key
-//! TODO (Tue): Implement list_datasets() + get_schema()
-//! TODO (Wed): Implement run_query() with max_bytes_scanned guard
-//! TODO (Thu): Wire schema_discoverer persona end-to-end
+//! TODO: Implement run_query() with max_bytes_scanned guard
+//! TODO: Implement get_audit_logs() for lineage extraction
+//! TODO: Wire schema_discoverer persona end-to-end
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -103,6 +97,23 @@ pub struct BqAuditEntry {
     pub bytes_processed: i64,
 }
 
+/// Parse a table reference into (project, dataset, table).
+/// Accepts "dataset.table" (project from default) or "project.dataset.table".
+pub fn parse_table_ref(table_ref: &str, default_project: &str) -> Result<(String, String, String)> {
+    let parts: Vec<&str> = table_ref.split('.').collect();
+    match parts.as_slice() {
+        [dataset, table] if !dataset.is_empty() && !table.is_empty() => Ok((
+            default_project.to_string(),
+            dataset.to_string(),
+            table.to_string(),
+        )),
+        [project, dataset, table] if !project.is_empty() && !dataset.is_empty() && !table.is_empty() => {
+            Ok((project.to_string(), dataset.to_string(), table.to_string()))
+        }
+        _ => Err(BqGuardError::InvalidTable(table_ref.to_string()).into()),
+    }
+}
+
 /// Cost guardrail violation
 #[derive(Debug, thiserror::Error)]
 pub enum BqGuardError {
@@ -122,6 +133,9 @@ pub trait BigQueryAdapter: Send + Sync {
 
     /// List all datasets in the configured project
     async fn list_datasets(&self) -> Result<Vec<BqDataset>>;
+
+    /// List table IDs in a dataset (configured project)
+    async fn list_tables(&self, dataset_id: &str) -> Result<Vec<String>>;
 
     /// Get full schema for a specific table
     /// Format: "dataset.table" or "project.dataset.table"
@@ -201,21 +215,95 @@ impl BigQueryAdapter for BqAdapterLive {
         Ok(datasets)
     }
 
+    async fn list_tables(&self, dataset_id: &str) -> Result<Vec<String>> {
+        let client = self
+            .client
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Not authenticated — call authenticate() first"))?;
+        let config = self
+            .config
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No BqConfig set"))?;
+
+        // TODO: pagination via next_page_token for datasets with >50 tables
+        let result = client
+            .table()
+            .list(&config.project_id, dataset_id, Default::default())
+            .await?;
+
+        Ok(result
+            .tables
+            .unwrap_or_default()
+            .into_iter()
+            .map(|t| t.table_reference.table_id)
+            .collect())
+    }
+
     async fn get_schema(&self, table_ref: &str) -> Result<BqTableSchema> {
-        // TODO(Tue): Parse table_ref into project/dataset/table
-        // TODO(Tue): Call BQ API: GET /tables/{ref}
-        // TODO(Tue): Fetch columns, partitioning, clustering
-        tracing::info!("BQ get_schema stub for {}", table_ref);
+        let client = self
+            .client
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Not authenticated — call authenticate() first"))?;
+        let config = self
+            .config
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No BqConfig set"))?;
+
+        let (project, dataset, table) = parse_table_ref(table_ref, &config.project_id)?;
+
+        let t = client
+            .table()
+            .get(&project, &dataset, &table, None)
+            .await?;
+
+        let partition_column = t
+            .time_partitioning
+            .as_ref()
+            .and_then(|tp| tp.field.clone());
+        let clustering_columns: Vec<String> = t
+            .clustering
+            .as_ref()
+            .and_then(|c| c.fields.clone())
+            .unwrap_or_default();
+
+        // Top-level fields only; nested RECORD fields are not flattened yet
+        let columns = t
+            .schema
+            .fields
+            .unwrap_or_default()
+            .into_iter()
+            .map(|f| {
+                let data_type = serde_json::to_string(&f.r#type)
+                    .map(|s| s.trim_matches('"').to_string())
+                    .unwrap_or_else(|_| format!("{:?}", f.r#type).to_uppercase());
+                BqColumn {
+                    is_partitioned: partition_column.as_deref() == Some(f.name.as_str()),
+                    is_clustered: clustering_columns.contains(&f.name),
+                    name: f.name,
+                    data_type,
+                    mode: f.mode.unwrap_or_else(|| "NULLABLE".to_string()),
+                    description: f.description,
+                }
+            })
+            .collect();
+
+        let last_modified = t
+            .last_modified_time
+            .as_deref()
+            .and_then(|ms| ms.parse::<i64>().ok())
+            .and_then(|ms| chrono::DateTime::<Utc>::from_timestamp_millis(ms))
+            .unwrap_or_else(Utc::now);
+
         Ok(BqTableSchema {
-            dataset_id: "stub".to_string(),
-            table_id: table_ref.to_string(),
-            columns: vec![],
-            partition_column: None,
-            clustering_columns: vec![],
-            num_bytes: 0,
-            num_rows: 0,
-            last_modified: Utc::now(),
-            description: None,
+            dataset_id: dataset,
+            table_id: table,
+            columns,
+            partition_column,
+            clustering_columns,
+            num_bytes: t.num_bytes.as_deref().and_then(|s| s.parse().ok()).unwrap_or(0),
+            num_rows: t.num_rows.as_deref().and_then(|s| s.parse().ok()).unwrap_or(0),
+            last_modified,
+            description: t.description,
         })
     }
 
@@ -265,6 +353,15 @@ impl BigQueryAdapter for BqAdapterMock {
         Ok(self.datasets.clone())
     }
 
+    async fn list_tables(&self, dataset_id: &str) -> Result<Vec<String>> {
+        Ok(self
+            .schemas
+            .iter()
+            .filter(|s| s.dataset_id == dataset_id)
+            .map(|s| s.table_id.clone())
+            .collect())
+    }
+
     async fn get_schema(&self, table_ref: &str) -> Result<BqTableSchema> {
         self.schemas
             .iter()
@@ -287,5 +384,60 @@ impl BigQueryAdapter for BqAdapterMock {
         _end: DateTime<Utc>,
     ) -> Result<Vec<BqAuditEntry>> {
         Ok(self.audit_logs.clone())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn schema(ds: &str, t: &str) -> BqTableSchema {
+        BqTableSchema {
+            dataset_id: ds.to_string(),
+            table_id: t.to_string(),
+            columns: vec![],
+            partition_column: None,
+            clustering_columns: vec![],
+            num_bytes: 0,
+            num_rows: 0,
+            last_modified: Utc::now(),
+            description: None,
+        }
+    }
+
+    #[test]
+    fn test_parse_table_ref_two_parts_uses_default_project() {
+        let (p, d, t) = parse_table_ref("austin_311.service_requests", "default-proj").unwrap();
+        assert_eq!(p, "default-proj");
+        assert_eq!(d, "austin_311");
+        assert_eq!(t, "service_requests");
+    }
+
+    #[test]
+    fn test_parse_table_ref_three_parts() {
+        let (p, d, t) =
+            parse_table_ref("bigquery-public-data.austin_311.311_service_requests", "x").unwrap();
+        assert_eq!(p, "bigquery-public-data");
+        assert_eq!(d, "austin_311");
+        assert_eq!(t, "311_service_requests");
+    }
+
+    #[test]
+    fn test_parse_table_ref_invalid() {
+        assert!(parse_table_ref("justatable", "x").is_err());
+        assert!(parse_table_ref("a.b.c.d", "x").is_err());
+        assert!(parse_table_ref("", "x").is_err());
+    }
+
+    #[tokio::test]
+    async fn test_mock_list_tables_filters_by_dataset() {
+        let mock = BqAdapterMock {
+            datasets: vec![],
+            schemas: vec![schema("ds1", "t1"), schema("ds2", "t2"), schema("ds1", "t3")],
+            query_results: vec![],
+            audit_logs: vec![],
+        };
+        let tables = mock.list_tables("ds1").await.unwrap();
+        assert_eq!(tables, vec!["t1".to_string(), "t3".to_string()]);
     }
 }
