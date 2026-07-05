@@ -97,6 +97,44 @@ pub struct BqAuditEntry {
     pub bytes_processed: i64,
 }
 
+/// Serialize a BQ FieldType to its API string ("STRING", "RECORD", ...).
+fn field_type_str(t: &gcp_bigquery_client::model::field_type::FieldType) -> String {
+    serde_json::to_string(t)
+        .map(|s| s.trim_matches('"').to_string())
+        .unwrap_or_else(|_| format!("{:?}", t).to_uppercase())
+}
+
+/// Flatten a (possibly nested) field list into columns with dotted names.
+/// RECORD parents are kept as rows so the doc shows the structure, and
+/// their children follow as "parent.child".
+fn flatten_fields(
+    fields: Vec<gcp_bigquery_client::model::table_field_schema::TableFieldSchema>,
+    prefix: &str,
+    partition_column: &Option<String>,
+    clustering_columns: &[String],
+) -> Vec<BqColumn> {
+    let mut out = Vec::new();
+    for f in fields {
+        let name = if prefix.is_empty() {
+            f.name.clone()
+        } else {
+            format!("{}.{}", prefix, f.name)
+        };
+        out.push(BqColumn {
+            is_partitioned: partition_column.as_deref() == Some(name.as_str()),
+            is_clustered: clustering_columns.contains(&name),
+            name: name.clone(),
+            data_type: field_type_str(&f.r#type),
+            mode: f.mode.clone().unwrap_or_else(|| "NULLABLE".to_string()),
+            description: f.description.clone(),
+        });
+        if let Some(children) = f.fields {
+            out.extend(flatten_fields(children, &name, partition_column, clustering_columns));
+        }
+    }
+    out
+}
+
 /// Parse a table reference into (project, dataset, table).
 /// Accepts "dataset.table" (project from default) or "project.dataset.table".
 pub fn parse_table_ref(table_ref: &str, default_project: &str) -> Result<(String, String, String)> {
@@ -171,10 +209,14 @@ impl BqAdapterLive {
 #[async_trait]
 impl BigQueryAdapter for BqAdapterLive {
     async fn authenticate(&mut self, config: &BqConfig) -> Result<()> {
-        let client = gcp_bigquery_client::Client::from_service_account_key_file(
-            &config.credentials_path,
-        )
-        .await?;
+        // Empty credentials_path = use Application Default Credentials
+        // (`gcloud auth application-default login`)
+        let client = if config.credentials_path.is_empty() {
+            gcp_bigquery_client::Client::from_application_default_credentials().await?
+        } else {
+            gcp_bigquery_client::Client::from_service_account_key_file(&config.credentials_path)
+                .await?
+        };
         self.client = Some(client);
         self.config = Some(config.clone());
         tracing::info!("BQ auth OK: project={}", config.project_id);
@@ -266,26 +308,12 @@ impl BigQueryAdapter for BqAdapterLive {
             .and_then(|c| c.fields.clone())
             .unwrap_or_default();
 
-        // Top-level fields only; nested RECORD fields are not flattened yet
-        let columns = t
-            .schema
-            .fields
-            .unwrap_or_default()
-            .into_iter()
-            .map(|f| {
-                let data_type = serde_json::to_string(&f.r#type)
-                    .map(|s| s.trim_matches('"').to_string())
-                    .unwrap_or_else(|_| format!("{:?}", f.r#type).to_uppercase());
-                BqColumn {
-                    is_partitioned: partition_column.as_deref() == Some(f.name.as_str()),
-                    is_clustered: clustering_columns.contains(&f.name),
-                    name: f.name,
-                    data_type,
-                    mode: f.mode.unwrap_or_else(|| "NULLABLE".to_string()),
-                    description: f.description,
-                }
-            })
-            .collect();
+        let columns = flatten_fields(
+            t.schema.fields.unwrap_or_default(),
+            "",
+            &partition_column,
+            &clustering_columns,
+        );
 
         let last_modified = t
             .last_modified_time
@@ -427,6 +455,36 @@ mod tests {
         assert!(parse_table_ref("justatable", "x").is_err());
         assert!(parse_table_ref("a.b.c.d", "x").is_err());
         assert!(parse_table_ref("", "x").is_err());
+    }
+
+    #[test]
+    fn test_flatten_fields_nested_record() {
+        use gcp_bigquery_client::model::field_type::FieldType;
+        use gcp_bigquery_client::model::table_field_schema::TableFieldSchema;
+
+        let mut device = TableFieldSchema::new("device", FieldType::Record);
+        device.fields = Some(vec![TableFieldSchema::new("browser", FieldType::String)]);
+        let mut totals = TableFieldSchema::new("totals", FieldType::Record);
+        totals.mode = Some("REPEATED".to_string());
+        totals.fields = Some(vec![TableFieldSchema::new("visits", FieldType::Integer), device]);
+
+        let cols = flatten_fields(
+            vec![TableFieldSchema::new("id", FieldType::String), totals],
+            "",
+            &None,
+            &[],
+        );
+
+        let names: Vec<&str> = cols.iter().map(|c| c.name.as_str()).collect();
+        assert_eq!(
+            names,
+            vec!["id", "totals", "totals.visits", "totals.device", "totals.device.browser"]
+        );
+        let t = cols.iter().find(|c| c.name == "totals").unwrap();
+        assert_eq!(t.data_type, "RECORD");
+        assert_eq!(t.mode, "REPEATED");
+        let leaf = cols.iter().find(|c| c.name == "totals.device.browser").unwrap();
+        assert_eq!(leaf.data_type, "STRING");
     }
 
     #[tokio::test]

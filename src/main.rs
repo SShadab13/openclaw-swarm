@@ -346,8 +346,11 @@ async fn main() -> Result<()> {
 
             let credentials_path = credentials
                 .or_else(|| std::env::var("BQ_CREDENTIALS_PATH").ok())
-                .ok_or_else(|| anyhow::anyhow!(
-                    "No credentials: pass --credentials or set BQ_CREDENTIALS_PATH"))?;
+                .unwrap_or_default();
+            if credentials_path.is_empty() {
+                info!("No key file given - using Application Default Credentials \
+                       (run `gcloud auth application-default login` once)");
+            }
 
             let (project, dataset_id) = dataset
                 .split_once(['.', ':'])
