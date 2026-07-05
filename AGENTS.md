@@ -48,7 +48,9 @@ BQ toolkit is LIVE and demoed. Working end-to-end with gcloud ADC (project `open
 - 4 niche demo docs + PDF sample in `docs/demo/`; README leads with the toolkit; client docs in `docs/client/`
 - 52/52 tests green. `cargo run` needs `--bin openclaw-swarm`.
 Auth note: crate's `from_application_default_credentials()` only works on GCE VMs; adapter resolves gcloud's ADC file itself (see `adc_well_known_path`). `from_authorized_user_secret()` takes a file PATH despite the name.
-Still stubs: `run_query()` (needs max_bytes_scanned dry-run guard - next task, unlocks bq-lint), `get_audit_logs()`.
+- `bq-lint` - metadata-only dataset auditor (cost traps + doc gaps); live demo report `docs/demo/cms_medicare_lint.md` (5 real warnings)
+- `run_query()` real with double cost guard (dry-run estimate + server-side maximum_bytes_billed). Live query tests gate on `BQ_PROJECT_ID` env (use ADC).
+Only stub left: `get_audit_logs()` (lineage extraction - needs client-project JOBS access, can't demo on public data).
 Business docs: pricing/tiers/legal in vault `wiki/syntheses/BQ DE Service - Client Playbook.md`.
 
 ## Known Defects (eval 2026-07-05)
