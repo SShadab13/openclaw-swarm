@@ -15,6 +15,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use gcp_bigquery_client;
 use serde::{Deserialize, Serialize};
 
 /// BigQuery connection configuration
@@ -138,35 +139,66 @@ pub trait BigQueryAdapter: Send + Sync {
     ) -> Result<Vec<BqAuditEntry>>;
 }
 
-/// Concrete adapter implementation (placeholder — week 1 stub)
+/// Concrete adapter implementation backed by the real GCP BigQuery client.
 pub struct BqAdapterLive {
-    // TODO: google-cloud-bigquery client
-    // TODO: authenticated project handle
+    client: Option<gcp_bigquery_client::Client>,
     config: Option<BqConfig>,
 }
 
 impl BqAdapterLive {
     pub fn new() -> Self {
-        Self { config: None }
+        Self {
+            client: None,
+            config: None,
+        }
     }
 }
 
 #[async_trait]
 impl BigQueryAdapter for BqAdapterLive {
     async fn authenticate(&mut self, config: &BqConfig) -> Result<()> {
-        // TODO(Mon): Load service-account JSON from credentials_path
-        // TODO(Mon): Initialize google-cloud-bigquery client
-        // TODO(Mon): Validate project_id access
+        let client = gcp_bigquery_client::Client::from_service_account_key_file(
+            &config.credentials_path,
+        )
+        .await?;
+        self.client = Some(client);
         self.config = Some(config.clone());
-        tracing::info!("BQ auth stub: would authenticate to project {}", config.project_id);
+        tracing::info!("BQ auth OK: project={}", config.project_id);
         Ok(())
     }
 
     async fn list_datasets(&self) -> Result<Vec<BqDataset>> {
-        // TODO(Tue): Call BQ REST API: GET /projects/{project}/datasets
-        // TODO(Tue): Parse response into Vec<BqDataset>
-        tracing::info!("BQ list_datasets stub");
-        Ok(vec![])
+        let client = self
+            .client
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Not authenticated — call authenticate() first"))?;
+        let config = self
+            .config
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No BqConfig set"))?;
+
+        let result = client
+            .dataset()
+            .list(&config.project_id, Default::default())
+            .await?;
+
+        let datasets = result
+            .datasets
+            .into_iter()
+            .map(|d| BqDataset {
+                dataset_id: d.dataset_reference.dataset_id,
+                location: d.location.unwrap_or_default(),
+                description: d.friendly_name,
+                labels: d
+                    .labels
+                    .unwrap_or_default()
+                    .into_iter()
+                    .collect(),
+                access_entries: vec![],
+            })
+            .collect();
+
+        Ok(datasets)
     }
 
     async fn get_schema(&self, table_ref: &str) -> Result<BqTableSchema> {
