@@ -135,6 +135,19 @@ fn flatten_fields(
     out
 }
 
+/// Locate gcloud's Application Default Credentials file.
+/// Windows: %APPDATA%\gcloud\..., Unix: ~/.config/gcloud/...
+fn adc_well_known_path() -> Result<std::path::PathBuf> {
+    let name = "application_default_credentials.json";
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        return Ok(std::path::Path::new(&appdata).join("gcloud").join(name));
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        return Ok(std::path::Path::new(&home).join(".config").join("gcloud").join(name));
+    }
+    Err(anyhow::anyhow!("Cannot locate gcloud config dir (no APPDATA or HOME)"))
+}
+
 /// Parse a table reference into (project, dataset, table).
 /// Accepts "dataset.table" (project from default) or "project.dataset.table".
 pub fn parse_table_ref(table_ref: &str, default_project: &str) -> Result<(String, String, String)> {
@@ -209,10 +222,27 @@ impl BqAdapterLive {
 #[async_trait]
 impl BigQueryAdapter for BqAdapterLive {
     async fn authenticate(&mut self, config: &BqConfig) -> Result<()> {
-        // Empty credentials_path = use Application Default Credentials
-        // (`gcloud auth application-default login`)
+        // Empty credentials_path = Application Default Credentials.
+        // The crate's from_application_default_credentials() only supports
+        // the GCE metadata server (nonexistent off-cloud), so resolve ADC
+        // ourselves: GOOGLE_APPLICATION_CREDENTIALS, then gcloud's file.
         let client = if config.credentials_path.is_empty() {
-            gcp_bigquery_client::Client::from_application_default_credentials().await?
+            if let Ok(key_file) = std::env::var("GOOGLE_APPLICATION_CREDENTIALS") {
+                gcp_bigquery_client::Client::from_service_account_key_file(&key_file).await?
+            } else {
+                let adc_path = adc_well_known_path()?;
+                if !adc_path.exists() {
+                    anyhow::bail!(
+                        "No ADC found at {} - run `gcloud auth application-default login`",
+                        adc_path.display()
+                    );
+                }
+                // Despite the name, this crate fn takes a PATH to the secret file
+                gcp_bigquery_client::Client::from_authorized_user_secret(
+                    &adc_path.to_string_lossy(),
+                )
+                .await?
+            }
         } else {
             gcp_bigquery_client::Client::from_service_account_key_file(&config.credentials_path)
                 .await?
