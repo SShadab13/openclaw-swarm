@@ -392,12 +392,12 @@ impl PlanningAgent {
 
     fn estimate_duration(&self, description: &str) -> u32 {
         let lower = description.to_lowercase();
-        let base = if lower.contains("simple") || lower.contains("quick") {
+        let base = if lower.contains("simple") || lower.contains("quick") || lower.contains("typo") {
             5
         } else if lower.contains("complex") || lower.contains("rebuild") {
             45
         } else {
-            15
+            10
         };
 
         let modifiers = lower.matches("and").count() as u32
