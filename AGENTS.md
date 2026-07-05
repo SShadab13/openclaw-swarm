@@ -40,16 +40,16 @@ src/
 docs/superpowers/plans/           ← implementation plans
 ```
 
-## Current Focus (updated 2026-07-05 night)
+## Current Focus (updated 2026-07-05 late night)
 
-BQ Data Engineering extension - remediation spec Phases 0-3 COMPLETE and pushed (commits 2f54287..dabc552).
-Done: real `authenticate()`, `list_datasets()`, `list_tables()`, `get_schema()`; `bq-doc` CLI subcommand renders markdown schema doc (`src/bq_doc.rs`); integration tests skip gracefully without `BQ_CREDENTIALS_PATH`. 48/48 tests green, release build ok.
-Still stubs: `run_query()` (needs max_bytes_scanned guard), `get_audit_logs()`. `list_tables()` has no pagination yet (>50 tables).
-Blocked on owner: GCP service-account key, then run:
-`cargo test test_list_bigquery_public_datasets -- --nocapture` and
-`cargo run --bin openclaw-swarm -- bq-doc --dataset bigquery-public-data.austin_311 --out docs/demo/austin_311.md`
-Note: `cargo run` needs `--bin openclaw-swarm` (test_runner bin makes default ambiguous).
-Spec: `docs/superpowers/plans/2026-07-05-audit-remediation-spec.md`.
+BQ toolkit is LIVE and demoed. Working end-to-end with gcloud ADC (project `openclaw-bq-shadab13`, sandbox, $0):
+- `bq-doc` - markdown schema docs (nested RECORDs flattened, paginated table listing, TOC summary)
+- `bq-snapshot` + `bq-diff` - schema-change watcher (JSON snapshots -> markdown changelog)
+- 4 niche demo docs + PDF sample in `docs/demo/`; README leads with the toolkit; client docs in `docs/client/`
+- 52/52 tests green. `cargo run` needs `--bin openclaw-swarm`.
+Auth note: crate's `from_application_default_credentials()` only works on GCE VMs; adapter resolves gcloud's ADC file itself (see `adc_well_known_path`). `from_authorized_user_secret()` takes a file PATH despite the name.
+Still stubs: `run_query()` (needs max_bytes_scanned dry-run guard - next task, unlocks bq-lint), `get_audit_logs()`.
+Business docs: pricing/tiers/legal in vault `wiki/syntheses/BQ DE Service - Client Playbook.md`.
 
 ## Known Defects (eval 2026-07-05)
 
